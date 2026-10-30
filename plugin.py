@@ -73,9 +73,9 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @action("load-libraries")
     def load_libraries(self, input: dict, ctx: Context):
-        server_id = input.get("serverId")
+        server_id = input.get("serverId") or self._first_server_id(ctx)
         if not server_id:
-            raise ValueError("请先选择 Emby 服务器")
+            raise ValueError("请先在设置中授权 Emby 服务器")
         result = ctx.mt.emby.request(
             server_id=server_id,
             path="/Library/SelectableMediaFolders",
@@ -93,7 +93,7 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @action("load-items")
     def load_items(self, input: dict, ctx: Context):
-        server_id = input.get("serverId")
+        server_id = input.get("serverId") or self._first_server_id(ctx)
         library_id = input.get("libraryId")
         if not server_id or not library_id:
             raise ValueError("请先选择服务器和媒体库")
@@ -119,12 +119,22 @@ class Plugin(BasePlugin):
         ctx.mt.log(level="info", message=f"已加载 {len(opts)} 个条目")
         return {"count": len(opts)}
 
+    def _first_server_id(self, ctx: Context) -> str | None:
+        """返回第一个已授权且启用的 Emby 服务器 ID，无则 None。"""
+        servers = ctx.mt.emby.servers.list()
+        for s in servers:
+            if s.get("enabled") and s.get("hasApiKey"):
+                return s.get("id")
+        if servers:
+            return servers[0].get("id")
+        return None
+
     # ------------------------------------------------------------------ #
     # 动作：生成封面并上传到 Emby 条目
     # ------------------------------------------------------------------ #
     @action("generate-cover")
     def generate_cover(self, input: dict, ctx: Context):
-        server_id = input.get("serverId")
+        server_id = input.get("serverId") or self._first_server_id(ctx)
         target_id = input.get("targetId")
         layout = input.get("layout") or "经典九宫格"
         title_size = int(input.get("titleSize") or 160)
@@ -132,7 +142,7 @@ class Plugin(BasePlugin):
         upload = bool(input.get("upload"))
 
         if not server_id:
-            raise ValueError("请先选择 Emby 服务器")
+            raise ValueError("请先在设置中授权 Emby 服务器")
         if not target_id:
             raise ValueError("请先选择目标条目")
 

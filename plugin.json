@@ -24,7 +24,7 @@
       "inputSchema": {
         "type": "object",
         "properties": { "serverId": { "type": "string" } },
-        "required": ["serverId"]
+        "required": []
       },
       "outputSchema": {}
     },
@@ -38,7 +38,7 @@
           "serverId": { "type": "string" },
           "libraryId": { "type": "string" }
         },
-        "required": ["serverId", "libraryId"]
+        "required": ["libraryId"]
       },
       "outputSchema": {}
     },
@@ -59,7 +59,7 @@
           "path": { "type": "string" },
           "upload": { "type": "boolean" }
         },
-        "required": ["serverId", "targetId"]
+        "required": ["targetId"]
       },
       "outputSchema": {}
     }
