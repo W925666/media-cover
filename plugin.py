@@ -222,10 +222,18 @@ class Plugin(BasePlugin):
         return ui.page(
             ui.Card(
                 ui.Text(text="选择 Emby 服务器、媒体库与条目，标题会自动取条目名。"),
+                ui.Text(text="诊断 servers.data："),
+                ui.Text(text=ui.ref("query.servers.data")),
                 ui.Select(label="Emby 服务器", bind="state.serverId",
                           options=ui.ref("query.servers.data")),
+                ui.Button(label="加载媒体库", onClick=[
+                    {"type": "query", "queryId": "libraries"},
+                ]),
                 ui.Select(label="媒体库", bind="state.libraryId",
                           options=ui.ref("query.libraries.data")),
+                ui.Button(label="加载条目", onClick=[
+                    {"type": "query", "queryId": "items"},
+                ]),
                 ui.Select(label="目标条目", bind="state.targetId",
                           options=ui.ref("query.items.data")),
             ),
