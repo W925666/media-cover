@@ -53,13 +53,29 @@ class Plugin(BasePlugin):
         return _to_options(servers, "name", "id")
 
     # ------------------------------------------------------------------ #
-    # 查询：媒体库列表
+    # 查询：媒体库列表（读 storage 缓存）
     # ------------------------------------------------------------------ #
     @query("libraries")
     def libraries(self, input: dict, ctx: Context):
+        data = ctx.mt.storage.get(key="libraries")
+        return data.get("value") or [] if data.get("found") else []
+
+    # ------------------------------------------------------------------ #
+    # 查询：条目列表（读 storage 缓存）
+    # ------------------------------------------------------------------ #
+    @query("items")
+    def items(self, input: dict, ctx: Context):
+        data = ctx.mt.storage.get(key="items")
+        return data.get("value") or [] if data.get("found") else []
+
+    # ------------------------------------------------------------------ #
+    # 动作：加载媒体库（结果写入 storage）
+    # ------------------------------------------------------------------ #
+    @action("load-libraries")
+    def load_libraries(self, input: dict, ctx: Context):
         server_id = input.get("serverId")
         if not server_id:
-            return []
+            raise ValueError("请先选择 Emby 服务器")
         result = ctx.mt.emby.request(
             server_id=server_id,
             path="/Library/SelectableMediaFolders",
@@ -67,18 +83,20 @@ class Plugin(BasePlugin):
         if result["status"] != 200:
             raise ValueError(f"Emby 返回 HTTP {result['status']}")
         data = result["data"] or []
-        return _to_options(data, "Name", "Id")
+        opts = _to_options(data, "Name", "Id")
+        ctx.mt.storage.set(key="libraries", value=opts)
+        ctx.mt.log(level="info", message=f"已加载 {len(opts)} 个媒体库")
+        return {"count": len(opts)}
 
     # ------------------------------------------------------------------ #
-    # 查询：条目列表（按库）
+    # 动作：加载条目（结果写入 storage）
     # ------------------------------------------------------------------ #
-    @query("items")
-    def items(self, input: dict, ctx: Context):
+    @action("load-items")
+    def load_items(self, input: dict, ctx: Context):
         server_id = input.get("serverId")
         library_id = input.get("libraryId")
-        term = input.get("term") or ""
         if not server_id or not library_id:
-            return []
+            raise ValueError("请先选择服务器和媒体库")
         q: dict[str, Any] = {
             "ParentId": library_id,
             "Recursive": True,
@@ -87,8 +105,6 @@ class Plugin(BasePlugin):
             "Limit": 100,
             "StartIndex": 0,
         }
-        if term:
-            q["SearchTerm"] = term
         result = ctx.mt.emby.request(server_id=server_id, path="/Items", query=q)
         if result["status"] != 200:
             raise ValueError(f"Emby 返回 HTTP {result['status']}")
@@ -99,7 +115,9 @@ class Plugin(BasePlugin):
             year = it.get("ProductionYear")
             label = f"{name} ({year})" if year else name
             opts.append({"label": label, "value": it.get("Id")})
-        return opts
+        ctx.mt.storage.set(key="items", value=opts)
+        ctx.mt.log(level="info", message=f"已加载 {len(opts)} 个条目")
+        return {"count": len(opts)}
 
     # ------------------------------------------------------------------ #
     # 动作：生成封面并上传到 Emby 条目
@@ -224,14 +242,19 @@ class Plugin(BasePlugin):
                 ui.Text(text="选择 Emby 服务器、媒体库与条目，标题会自动取条目名。"),
                 ui.Select(label="Emby 服务器", bind="state.serverId",
                           options=ui.ref("query.servers.data")),
-                ui.Button(label="加载媒体库", onClick=[
-                    {"type": "query", "queryId": "libraries"},
-                ]),
+                ui.Button(label="加载媒体库", onClick=[{
+                    "type": "invoke", "actionId": "load-libraries",
+                    "input": {"serverId": ui.ref("state.serverId")},
+                }]),
                 ui.Select(label="媒体库", bind="state.libraryId",
                           options=ui.ref("query.libraries.data")),
-                ui.Button(label="加载条目", onClick=[
-                    {"type": "query", "queryId": "items"},
-                ]),
+                ui.Button(label="加载条目", onClick=[{
+                    "type": "invoke", "actionId": "load-items",
+                    "input": {
+                        "serverId": ui.ref("state.serverId"),
+                        "libraryId": ui.ref("state.libraryId"),
+                    },
+                }]),
                 ui.Select(label="目标条目", bind="state.targetId",
                           options=ui.ref("query.items.data")),
             ),
@@ -267,11 +290,8 @@ class Plugin(BasePlugin):
             ui.RunLog(),
             queries=[
                 {"id": "servers", "name": "servers"},
-                {"id": "libraries", "name": "libraries", "input": {"serverId": ui.ref("state.serverId")}},
-                {"id": "items", "name": "items", "input": {
-                    "serverId": ui.ref("state.serverId"),
-                    "libraryId": ui.ref("state.libraryId"),
-                }},
+                {"id": "libraries", "name": "libraries"},
+                {"id": "items", "name": "items"},
             ],
             state={
                 "serverId": None,

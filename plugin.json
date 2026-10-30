@@ -18,6 +18,31 @@
   },
   "actions": [
     {
+      "id": "load-libraries",
+      "label": "加载媒体库",
+      "fields": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": { "serverId": { "type": "string" } },
+        "required": ["serverId"]
+      },
+      "outputSchema": {}
+    },
+    {
+      "id": "load-items",
+      "label": "加载条目",
+      "fields": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": { "type": "string" },
+          "libraryId": { "type": "string" }
+        },
+        "required": ["serverId", "libraryId"]
+      },
+      "outputSchema": {}
+    },
+    {
       "id": "generate-cover",
       "label": "生成封面",
       "fields": [],
@@ -49,25 +74,13 @@
     {
       "id": "libraries",
       "label": "媒体库",
-      "inputSchema": {
-        "type": "object",
-        "properties": { "serverId": { "type": "string" } },
-        "required": ["serverId"]
-      },
+      "inputSchema": { "type": "object" },
       "outputSchema": {}
     },
     {
       "id": "items",
       "label": "条目",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "serverId": { "type": "string" },
-          "libraryId": { "type": "string" },
-          "term": { "type": "string" }
-        },
-        "required": ["serverId", "libraryId"]
-      },
+      "inputSchema": { "type": "object" },
       "outputSchema": {}
     },
     {
