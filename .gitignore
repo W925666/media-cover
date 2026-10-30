@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 虚拟环境
+.venv/
+
+# mypy / 工具缓存
+.mypy_cache/
+.dmypy.json
+
+# 构建产物（ZIP 可单独在 releases 上传，不入库）
+dist/
+
+# 系统
+.DS_Store
+Thumbs.db

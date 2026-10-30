@@ -1,0 +1,96 @@
+{
+  "id": "cover.factory",
+  "name": "封面工厂",
+  "version": "0.1.0",
+  "sdkVersion": "2",
+  "author": "MediaTidy",
+  "description": "复用 FrameBase 的 Pillow 封面渲染核心，从本地授权目录素材图片生成 Emby 封面（九宫格/堆叠/海报墙等多种布局），并可通过 Emby API 上传到目标条目。",
+  "entry": "plugin.py:Plugin",
+  "permissions": [
+    "emby.api",
+    "files.read",
+    "storage"
+  ],
+  "config": [],
+  "configSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "actions": [
+    {
+      "id": "list-libraries",
+      "label": "列出媒体库",
+      "fields": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": { "type": "string" }
+        },
+        "required": ["serverId"]
+      },
+      "outputSchema": {}
+    },
+    {
+      "id": "search-items",
+      "label": "搜索条目",
+      "fields": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": { "type": "string" },
+          "libraryId": { "type": "string" },
+          "term": { "type": "string" }
+        },
+        "required": ["serverId"]
+      },
+      "outputSchema": {}
+    },
+    {
+      "id": "generate-cover",
+      "label": "生成封面",
+      "fields": [
+        {
+          "key": "files",
+          "label": "素材图片",
+          "type": "files",
+          "required": false
+        }
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": { "type": "string" },
+          "targetId": { "type": "string" },
+          "title": { "type": "string" },
+          "subtitle": { "type": "string" },
+          "layout": { "type": "string" },
+          "fontTitle": { "type": "string" },
+          "fontSubtitle": { "type": "string" },
+          "titleSize": { "type": "integer" },
+          "subtitleSize": { "type": "integer" },
+          "upload": { "type": "boolean" }
+        }
+      },
+      "outputSchema": {}
+    }
+  ],
+  "queries": [
+    {
+      "id": "servers",
+      "label": "Emby 服务器",
+      "inputSchema": { "type": "object" },
+      "outputSchema": {}
+    },
+    {
+      "id": "preview",
+      "label": "最新预览",
+      "inputSchema": { "type": "object" },
+      "outputSchema": {}
+    }
+  ],
+  "triggers": [],
+  "ui": {
+    "mode": "python",
+    "version": "2"
+  }
+}
