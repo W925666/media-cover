@@ -222,8 +222,6 @@ class Plugin(BasePlugin):
         return ui.page(
             ui.Card(
                 ui.Text(text="选择 Emby 服务器、媒体库与条目，标题会自动取条目名。"),
-                ui.Text(text="诊断 servers.data："),
-                ui.Text(text=ui.ref("query.servers.data")),
                 ui.Select(label="Emby 服务器", bind="state.serverId",
                           options=ui.ref("query.servers.data")),
                 ui.Button(label="加载媒体库", onClick=[
@@ -238,8 +236,8 @@ class Plugin(BasePlugin):
                           options=ui.ref("query.items.data")),
             ),
             ui.Card(
-                ui.Text(text="素材与样式"),
-                ui.DirectoryPicker(bind="state.assetDir"),
+                ui.Text(text="素材与样式：用文件选择器直接选素材图片（可多选）。"),
+                ui.FilePicker(),
                 ui.Select(label="布局模板", bind="state.layout", options=[
                     {"label": "经典九宫格", "value": "经典九宫格"},
                     {"label": "经典堆叠", "value": "经典堆叠"},
@@ -261,8 +259,6 @@ class Plugin(BasePlugin):
                         "layout": ui.ref("state.layout"),
                         "titleSize": ui.ref("state.titleSize"),
                         "subtitleSize": ui.ref("state.subtitleSize"),
-                        "rootId": ui.ref("state.assetDir.rootId"),
-                        "path": ui.ref("state.assetDir.path"),
                         "upload": True,
                     },
                 }]),
@@ -281,7 +277,6 @@ class Plugin(BasePlugin):
                 "serverId": None,
                 "libraryId": None,
                 "targetId": None,
-                "assetDir": None,
                 "layout": "经典九宫格",
                 "titleSize": 160,
                 "subtitleSize": 80,
