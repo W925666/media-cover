@@ -23,7 +23,11 @@
       "fields": [],
       "inputSchema": {
         "type": "object",
-        "properties": { "serverId": { "type": "string" } },
+        "properties": {
+          "serverId": {
+            "type": "string"
+          }
+        },
         "required": []
       },
       "outputSchema": {}
@@ -35,10 +39,16 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "serverId": { "type": "string" },
-          "libraryId": { "type": "string" }
+          "serverId": {
+            "type": "string"
+          },
+          "libraryId": {
+            "type": "string"
+          }
         },
-        "required": ["libraryId"]
+        "required": [
+          "libraryId"
+        ]
       },
       "outputSchema": {}
     },
@@ -49,17 +59,57 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "serverId": { "type": "string" },
-          "targetId": { "type": "string" },
-          "title": { "type": "string" },
-          "layout": { "type": "string" },
-          "titleSize": { "type": "integer" },
-          "subtitleSize": { "type": "integer" },
-          "rootId": { "type": "string" },
-          "path": { "type": "string" },
-          "upload": { "type": "boolean" }
+          "serverId": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "layout": {
+            "type": "string"
+          },
+          "titleSize": {
+            "type": "integer"
+          },
+          "subtitleSize": {
+            "type": "integer"
+          },
+          "rootId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "upload": {
+            "type": "boolean"
+          }
         },
-        "required": ["targetId"]
+        "required": [
+          "targetId"
+        ]
+      },
+      "outputSchema": {}
+    },
+    {
+      "id": "probe-image",
+      "label": "探测图片",
+      "fields": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId"
+        ]
       },
       "outputSchema": {}
     }
@@ -68,25 +118,33 @@
     {
       "id": "servers",
       "label": "Emby 服务器",
-      "inputSchema": { "type": "object" },
+      "inputSchema": {
+        "type": "object"
+      },
       "outputSchema": {}
     },
     {
       "id": "libraries",
       "label": "媒体库",
-      "inputSchema": { "type": "object" },
+      "inputSchema": {
+        "type": "object"
+      },
       "outputSchema": {}
     },
     {
       "id": "items",
       "label": "条目",
-      "inputSchema": { "type": "object" },
+      "inputSchema": {
+        "type": "object"
+      },
       "outputSchema": {}
     },
     {
       "id": "preview",
       "label": "最新预览",
-      "inputSchema": { "type": "object" },
+      "inputSchema": {
+        "type": "object"
+      },
       "outputSchema": {}
     }
   ],

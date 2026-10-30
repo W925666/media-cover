@@ -130,6 +130,39 @@ class Plugin(BasePlugin):
         return None
 
     # ------------------------------------------------------------------ #
+    # 动作：探测 Emby 图片接口（临时调试）
+    # ------------------------------------------------------------------ #
+    @action("probe-image")
+    def probe_image(self, input: dict, ctx: Context):
+        server_id = input.get("serverId") or self._first_server_id(ctx)
+        item_id = input.get("itemId")
+        # 先拿 ImageTags 里的 Primary tag
+        info = ctx.mt.emby.request(
+            server_id=server_id, path="/Items", query={"Ids": item_id, "Fields": "ImageTags"}
+        )
+        tag = None
+        if info["status"] == 200:
+            rows = (info["data"] or {}).get("Items", [])
+            if rows:
+                tag = (rows[0].get("ImageTags") or {}).get("Primary")
+        # 试图片接口
+        img = ctx.mt.emby.request(
+            server_id=server_id, path=f"/Items/{item_id}/Images/Primary",
+            query={"tag": tag, "maxWidth": 300} if tag else {"maxWidth": 300},
+        )
+        data = img.get("data")
+        result = {
+            "itemId": item_id,
+            "primaryTag": tag,
+            "status": img["status"],
+            "dataType": type(data).__name__,
+            "dataLen": len(data) if data else 0,
+            "dataPreview": (repr(data)[:200] if data else None),
+        }
+        ctx.mt.log(level="info", message=f"probe-image 结果: {result}")
+        return result
+
+    # ------------------------------------------------------------------ #
     # 动作：生成封面并上传到 Emby 条目
     # ------------------------------------------------------------------ #
     @action("generate-cover")
