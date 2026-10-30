@@ -18,58 +18,23 @@
   },
   "actions": [
     {
-      "id": "list-libraries",
-      "label": "列出媒体库",
-      "fields": [],
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "serverId": { "type": "string" }
-        },
-        "required": ["serverId"]
-      },
-      "outputSchema": {}
-    },
-    {
-      "id": "search-items",
-      "label": "搜索条目",
-      "fields": [],
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "serverId": { "type": "string" },
-          "libraryId": { "type": "string" },
-          "term": { "type": "string" }
-        },
-        "required": ["serverId"]
-      },
-      "outputSchema": {}
-    },
-    {
       "id": "generate-cover",
       "label": "生成封面",
-      "fields": [
-        {
-          "key": "files",
-          "label": "素材图片",
-          "type": "files",
-          "required": false
-        }
-      ],
+      "fields": [],
       "inputSchema": {
         "type": "object",
         "properties": {
           "serverId": { "type": "string" },
           "targetId": { "type": "string" },
           "title": { "type": "string" },
-          "subtitle": { "type": "string" },
           "layout": { "type": "string" },
-          "fontTitle": { "type": "string" },
-          "fontSubtitle": { "type": "string" },
           "titleSize": { "type": "integer" },
           "subtitleSize": { "type": "integer" },
+          "rootId": { "type": "string" },
+          "path": { "type": "string" },
           "upload": { "type": "boolean" }
-        }
+        },
+        "required": ["serverId", "targetId"]
       },
       "outputSchema": {}
     }
@@ -79,6 +44,30 @@
       "id": "servers",
       "label": "Emby 服务器",
       "inputSchema": { "type": "object" },
+      "outputSchema": {}
+    },
+    {
+      "id": "libraries",
+      "label": "媒体库",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "serverId": { "type": "string" } },
+        "required": ["serverId"]
+      },
+      "outputSchema": {}
+    },
+    {
+      "id": "items",
+      "label": "条目",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": { "type": "string" },
+          "libraryId": { "type": "string" },
+          "term": { "type": "string" }
+        },
+        "required": ["serverId", "libraryId"]
+      },
       "outputSchema": {}
     },
     {
