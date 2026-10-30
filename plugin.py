@@ -229,7 +229,7 @@ class Plugin(BasePlugin):
                 ),
                 ui.Input(label="标题字号", bind="state.titleSize", type="number"),
                 ui.Input(label="副标题字号", bind="state.subtitleSize", type="number"),
-                ui.FilePicker(label="素材图片（背景/海报，可多选）"),
+                ui.FilePicker(),
                 ui.Button(
                     label="生成封面",
                     onClick=[{
