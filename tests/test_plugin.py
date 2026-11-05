@@ -114,9 +114,22 @@ def test_helpers():
 def test_queries_survive_empty_storage():
     p = plugin.Plugin()
     ctx = FakeCtx()
-    assert p.libraries({}, ctx) == []
+    # libraries 查询实时经 SDK 读取（假 Emby 返回 1 个库）
+    assert p.libraries({}, ctx) == [{"label": "Movies", "value": "lib1"}]
     assert p.items({}, ctx) == []
     assert p.preview({}, ctx) == {}
+
+
+def test_generate_cover_library_mode_without_target():
+    """一键模式：不给 targetId、只给 libraryId 时不报'未选择条目'。"""
+    p = plugin.Plugin()
+    ctx = FakeCtx(files=[])
+    try:
+        p.generate_cover({"libraryId": "lib1", "upload": False}, ctx)
+    except ValueError as e:
+        assert "素材" in str(e)  # 走到素材校验，说明 library 模式已接受
+    else:
+        raise AssertionError("expected ValueError for empty assets")
 
 
 def test_load_libraries_and_items():
@@ -166,4 +179,5 @@ if __name__ == "__main__":
     test_load_libraries_and_items(); print("test_load OK")
     test_generate_cover_no_assets_raises_clear_error(); print("test_generate_no_assets OK")
     test_generate_cover_rejects_bad_sizes_gracefully(); print("test_generate_bad_sizes OK")
+    test_generate_cover_library_mode_without_target(); print("test_library_mode OK")
     test_probe_image_requires_server_and_item(); print("test_probe OK")
