@@ -26,6 +26,13 @@ layouts/*.py       布局模块（render(ctx, bg, config, assets, fonts)）
 fonts/             内置字体
 ```
 
+## 本地测试（无需宿主）
+
+```bash
+python3 tests/test_engine.py   # 9 布局真实渲染 + 未知布局回退 + 任意 cwd 默认目录
+python3 tests/test_plugin.py   # 假 mt_plugin 桩：入参钳制、空素材报错、空 storage 查询
+```
+
 ## 开发与打包
 
 需要 Python 3.12 与 uv 0.6.7（SKILL 固定版本）：

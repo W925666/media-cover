@@ -7,6 +7,7 @@ import re
 import importlib.util
 import math
 import threading
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger("cover_factory.engine")
@@ -17,7 +18,18 @@ class PosterEngine:
     _layouts_loaded = False
 
     # 注意：layouts_dir 默认指向根目录下的 layouts 文件夹
+    # 相对路径先按当前工作目录解析，找不到时回退到项目根目录
+    # （engine/ 的父目录），保证从任意 cwd 导入 PosterEngine 都可用。
     def __init__(self, fonts_dir="fonts", layouts_dir="layouts"):
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if not os.path.isabs(fonts_dir) and not os.path.exists(fonts_dir):
+            candidate = os.path.join(project_root, fonts_dir)
+            if os.path.exists(candidate):
+                fonts_dir = candidate
+        if not os.path.isabs(layouts_dir) and not os.path.exists(layouts_dir):
+            candidate = os.path.join(project_root, layouts_dir)
+            if os.path.exists(candidate):
+                layouts_dir = candidate
         self.fonts_dir = fonts_dir
         self.layouts_dir = layouts_dir
         self.default_font_path = os.path.join(fonts_dir, "OPPOSans-B.ttf")
@@ -74,6 +86,12 @@ class PosterEngine:
                 base64_data = re.sub('^data:image/.+;base64,', '', url)
                 image_data = base64.b64decode(base64_data)
                 img = Image.open(BytesIO(image_data)).convert("RGBA")
+            elif url.startswith(("http://", "https://")):
+                # Emby 直连图片 URL（SDK emby.request 只返回 JSON/UTF-8，
+                # 拿不到二进制，所以图片走 urllib 直连，带 X-Emby-Token）
+                req = urllib.request.Request(url, headers={"Accept": "*/*"})
+                with urllib.request.urlopen(req, timeout=25) as resp:
+                    img = Image.open(BytesIO(resp.read())).convert("RGBA")
             elif os.path.isfile(url):
                 # 本地文件路径（已由宿主 ctx.download 落到工作目录）
                 img = Image.open(url).convert("RGBA")
@@ -861,8 +879,16 @@ class PosterEngine:
             if engine_type in self.layout_modules:
                 final_img = self.layout_modules[engine_type](self, bg, config, assets, fonts)
             else:
-                if 'classic' in self.layout_modules:
-                    final_img = self.layout_modules['classic'](self, bg, config, assets, fonts)
+                # 未知布局名（旧的 'classic' 键永不存在）回退到默认布局，
+                # 而不是静默返回纯色背景图
+                fallback = '经典九宫格'
+                if fallback in self.layout_modules:
+                    logger.warning(f"[Engine] 未知布局 {engine_type!r}，回退到 {fallback!r}")
+                    final_img = self.layout_modules[fallback](self, bg, config, assets, fonts)
+                elif self.layout_modules:
+                    first = next(iter(self.layout_modules))
+                    logger.warning(f"[Engine] 未知布局 {engine_type!r}，回退到 {first!r}")
+                    final_img = self.layout_modules[first](self, bg, config, assets, fonts)
                 else:
                     final_img = bg
 

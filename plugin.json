@@ -11,10 +11,27 @@
     "files.read",
     "storage"
   ],
-  "config": [],
+  "config": [
+    {
+      "key": "embyUrl",
+      "label": "Emby 地址（直连取图，如 http://192.168.1.10:8096）",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "key": "embyApiKey",
+      "label": "Emby API Key（Emby 后台 → 设置 → 高级 → API 密钥 → 新建）",
+      "type": "text",
+      "default": ""
+    }
+  ],
   "configSchema": {
     "type": "object",
-    "properties": {}
+    "additionalProperties": true,
+    "properties": {
+      "embyUrl": {"type": "string"},
+      "embyApiKey": {"type": "string"}
+    }
   },
   "actions": [
     {
@@ -76,6 +93,15 @@
           },
           "subtitleSize": {
             "type": "integer"
+          },
+          "libraryId": {
+            "type": "string"
+          },
+          "embyUrl": {
+            "type": "string"
+          },
+          "embyApiKey": {
+            "type": "string"
           },
           "rootId": {
             "type": "string"

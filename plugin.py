@@ -12,19 +12,77 @@ from __future__ import annotations
 
 import base64
 import os
+import urllib.request
 from pathlib import Path
 from typing import Any
 
 from mt_plugin import Plugin as BasePlugin, Context, action, query
 from mt_plugin import ui
 
-from engine import PosterEngine
+try:
+    from engine import PosterEngine
+except ImportError:  # 宿主以文件路径加载 plugin.py 时包内相对导入兜底
+    from engine.engine import PosterEngine  # type: ignore[no-redef]
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
 
 
-def _to_options(items: list[dict], label_key: str, value_key: str) -> list[dict]:
-    return [{"label": it.get(label_key) or "", "value": it.get(value_key)} for it in items]
+def _to_options(items: list, label_key: str, value_key: str) -> list[dict]:
+    return [
+        {"label": it.get(label_key) or "", "value": it.get(value_key)}
+        for it in (items or [])
+        if isinstance(it, dict)
+    ]
+
+
+def _parse_size(value: Any, default: int) -> int:
+    """宽容解析字号入参：非数字/越界时回退默认值并钳制到引擎范围 8~500。"""
+    try:
+        size = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(8, min(500, size))
+
+
+def _storage_value(data: Any) -> Any:
+    """storage.get 的返回形状不一：None / 无 found 字段时安全取 value。"""
+    if not isinstance(data, dict) or not data.get("found"):
+        return None
+    return data.get("value")
+
+
+class EmbyDirect:
+    """直连 Emby 取图片二进制。
+
+    参考 kunmini/mediatidy-cover-studio 的做法：SDK 的 emby.request 只支持
+    JSON/UTF-8 响应，拿不到图片二进制，所以下载海报和上传封面都用标准库
+    urllib 直连 Emby，需要用户在插件配置里填 Emby 地址 + API Key
+    （Emby 后台 → 设置 → 高级 → API 密钥 → 新建）。
+    读库/读条目仍然走 SDK（宿主自动鉴权）。
+    """
+
+    def __init__(self, base_url: str, api_key: str, timeout: int = 25):
+        self.base = (base_url or "").rstrip("/")
+        self.key = (api_key or "").strip()
+        self.timeout = timeout
+
+    @property
+    def ok(self) -> bool:
+        return bool(self.base and self.key)
+
+    def image_url(self, item_id: str, max_width: int = 1000) -> str:
+        return f"{self.base}/Items/{item_id}/Images/Primary?MaxWidth={max_width}&Quality=90"
+
+    def image(self, item_id: str, max_width: int = 1000) -> bytes | None:
+        try:
+            req = urllib.request.Request(
+                self.image_url(item_id, max_width),
+                headers={"X-Emby-Token": self.key, "Accept": "*/*"},
+            )
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                return resp.read()
+        except Exception:
+            return None
 
 
 class Plugin(BasePlugin):
@@ -57,16 +115,14 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @query("libraries")
     def libraries(self, input: dict, ctx: Context):
-        data = ctx.mt.storage.get(key="libraries")
-        return data.get("value") or [] if data.get("found") else []
+        return _storage_value(ctx.mt.storage.get(key="libraries")) or []
 
     # ------------------------------------------------------------------ #
     # 查询：条目列表（读 storage 缓存）
     # ------------------------------------------------------------------ #
     @query("items")
     def items(self, input: dict, ctx: Context):
-        data = ctx.mt.storage.get(key="items")
-        return data.get("value") or [] if data.get("found") else []
+        return _storage_value(ctx.mt.storage.get(key="items")) or []
 
     # ------------------------------------------------------------------ #
     # 动作：加载媒体库（结果写入 storage）
@@ -79,10 +135,10 @@ class Plugin(BasePlugin):
         result = ctx.mt.emby.request(
             server_id=server_id,
             path="/Library/SelectableMediaFolders",
-        )
-        if result["status"] != 200:
-            raise ValueError(f"Emby 返回 HTTP {result['status']}")
-        data = result["data"] or []
+        ) or {}
+        if result.get("status") != 200:
+            raise ValueError(f"Emby 返回 HTTP {result.get('status')}")
+        data = result.get("data") or []
         opts = _to_options(data, "Name", "Id")
         ctx.mt.storage.set(key="libraries", value=opts)
         ctx.mt.log(level="info", message=f"已加载 {len(opts)} 个媒体库")
@@ -105,10 +161,10 @@ class Plugin(BasePlugin):
             "Limit": 100,
             "StartIndex": 0,
         }
-        result = ctx.mt.emby.request(server_id=server_id, path="/Items", query=q)
-        if result["status"] != 200:
-            raise ValueError(f"Emby 返回 HTTP {result['status']}")
-        items = (result["data"] or {}).get("Items", [])
+        result = ctx.mt.emby.request(server_id=server_id, path="/Items", query=q) or {}
+        if result.get("status") != 200:
+            raise ValueError(f"Emby 返回 HTTP {result.get('status')}")
+        items = ((result.get("data") or {}).get("Items", []) if isinstance(result.get("data"), dict) else [])
         opts = []
         for it in items:
             name = it.get("Name") or ""
@@ -118,6 +174,48 @@ class Plugin(BasePlugin):
         ctx.mt.storage.set(key="items", value=opts)
         ctx.mt.log(level="info", message=f"已加载 {len(opts)} 个条目")
         return {"count": len(opts)}
+
+    def _plugin_config(self, ctx: Context) -> dict:
+        """读插件配置：优先宿主下发的 ctx.config，再退回 storage。"""
+        try:
+            raw = getattr(ctx, "config", None)
+            if isinstance(raw, dict) and raw:
+                return dict(raw)
+        except Exception:
+            pass
+        return _storage_value(ctx.mt.storage.get(key="config")) or {}
+
+    def _fetch_emby_posters(self, ctx: Context, server_id: str, library_id: str,
+                            direct: EmbyDirect, count: int = 9) -> list[str]:
+        """经 SDK 读同库条目（去重：作品名+年份只取一张），直连下载海报。
+
+        返回可交给 PosterEngine 的图片 URL 列表（引擎支持 http 直连下载）。
+        """
+        result = ctx.mt.emby.request(
+            server_id=server_id, path="/Items",
+            query={"ParentId": library_id, "Recursive": True,
+                   "IncludeItemTypes": "Movie,Series,BoxSet",
+                   "Fields": "ProductionYear,ImageTags", "Limit": 100,
+                   "EnableTotalRecordCount": True},
+        ) or {}
+        if result.get("status") != 200 or not isinstance(result.get("data"), dict):
+            return []
+        items = result["data"].get("Items", []) or []
+        seen: set[str] = set()
+        picked: list[str] = []
+        for it in items:
+            if not isinstance(it, dict) or not it.get("Id"):
+                continue
+            if not (it.get("ImageTags") or {}).get("Primary"):
+                continue
+            key = f"{str(it.get('Name') or '').strip().lower()}|{it.get('ProductionYear') or ''}"
+            if key in seen:
+                continue
+            seen.add(key)
+            picked.append(direct.image_url(str(it["Id"])))
+            if len(picked) >= count:
+                break
+        return picked
 
     def _first_server_id(self, ctx: Context) -> str | None:
         """返回第一个已授权且启用的 Emby 服务器 ID，无则 None。"""
@@ -136,25 +234,29 @@ class Plugin(BasePlugin):
     def probe_image(self, input: dict, ctx: Context):
         server_id = input.get("serverId") or self._first_server_id(ctx)
         item_id = input.get("itemId")
+        if not server_id:
+            raise ValueError("请先在设置中授权 Emby 服务器")
+        if not item_id:
+            raise ValueError("请先选择条目")
         # 先拿 ImageTags 里的 Primary tag
         info = ctx.mt.emby.request(
             server_id=server_id, path="/Items", query={"Ids": item_id, "Fields": "ImageTags"}
-        )
+        ) or {}
         tag = None
-        if info["status"] == 200:
-            rows = (info["data"] or {}).get("Items", [])
+        if info.get("status") == 200 and isinstance(info.get("data"), dict):
+            rows = info["data"].get("Items", [])
             if rows:
                 tag = (rows[0].get("ImageTags") or {}).get("Primary")
         # 试图片接口
         img = ctx.mt.emby.request(
             server_id=server_id, path=f"/Items/{item_id}/Images/Primary",
             query={"tag": tag, "maxWidth": 300} if tag else {"maxWidth": 300},
-        )
+        ) or {}
         data = img.get("data")
         result = {
             "itemId": item_id,
             "primaryTag": tag,
-            "status": img["status"],
+            "status": img.get("status"),
             "dataType": type(data).__name__,
             "dataLen": len(data) if data else 0,
             "dataPreview": (repr(data)[:200] if data else None),
@@ -170,8 +272,8 @@ class Plugin(BasePlugin):
         server_id = input.get("serverId") or self._first_server_id(ctx)
         target_id = input.get("targetId")
         layout = input.get("layout") or "经典九宫格"
-        title_size = int(input.get("titleSize") or 160)
-        subtitle_size = int(input.get("subtitleSize") or 80)
+        title_size = _parse_size(input.get("titleSize"), 160)
+        subtitle_size = _parse_size(input.get("subtitleSize"), 80)
         upload = bool(input.get("upload"))
 
         if not server_id:
@@ -187,9 +289,9 @@ class Plugin(BasePlugin):
                 server_id=server_id,
                 path="/Items",
                 query={"Ids": target_id, "Fields": "ProductionYear"},
-            )
-            if item["status"] == 200:
-                rows = (item["data"] or {}).get("Items", [])
+            ) or {}
+            if item.get("status") == 200 and isinstance(item.get("data"), dict):
+                rows = item["data"].get("Items", [])
                 if rows:
                     title = rows[0].get("Name") or ""
                     year = rows[0].get("ProductionYear")
@@ -197,30 +299,49 @@ class Plugin(BasePlugin):
         if not title:
             title = input.get("title") or "封面"
 
-        # 2. 素材图：本地授权目录中的图片
+        # 2. 素材图（两种来源，Emby 优先，不需要映射本地目录）：
+        #    a) Emby 模式：配置 embyUrl + embyApiKey 且传入 libraryId 时，
+        #       从同库作品海报取图（参考 kunmini/mediatidy-cover-studio）。
+        #       只需 emby.api 授权 + 勾选 Emby 服务器，无需 files.read/目录映射。
+        #    b) 本地模式：files.read 授权的本地目录素材图（需要 roots 目录映射）。
+        cfg = self._plugin_config(ctx)
+        direct = EmbyDirect(input.get("embyUrl") or cfg.get("embyUrl") or "",
+                            input.get("embyApiKey") or cfg.get("embyApiKey") or "")
+        library_id = input.get("libraryId")
+        poster_paths: list[str] = []
+        if direct.ok and library_id:
+            try:
+                poster_paths = self._fetch_emby_posters(ctx, server_id, str(library_id), direct)
+            except Exception as e:
+                ctx.mt.log(level="warn", message=f"Emby 海报获取失败，改用本地素材: {e}")
+                poster_paths = []
+
         root_id = input.get("rootId")
         asset_path = input.get("path") or "."
-        poster_paths: list[str] = []
         if root_id:
             page = 0
             while True:
-                res = ctx.mt.files.list(root_id=root_id, path=asset_path, page=page)
-                for f in res.get("items", []):
-                    if f.get("isDir"):
+                res = ctx.mt.files.list(root_id=root_id, path=asset_path, page=page) or {}
+                for f in res.get("items", []) or []:
+                    if not isinstance(f, dict) or f.get("isDir"):
                         continue
                     name = f.get("name") or ""
-                    if Path(name).suffix.lower() in IMAGE_EXTS:
+                    if Path(name).suffix.lower() in IMAGE_EXTS and f.get("ref"):
                         local = ctx.download(f["ref"])
                         poster_paths.append(str(local))
                 if not res.get("hasMore"):
                     break
                 page += 1
 
-        # 同时接受 FilePicker 直接选中的图片
-        for f in ctx.files:
-            if not f.get("isDir"):
-                local = ctx.download(f["ref"])
-                poster_paths.append(str(local))
+        # 同时接受 FilePicker 直接选中的图片（无选择时 ctx.files 可能为 None）
+        for f in ctx.files or []:
+            if not isinstance(f, dict) or f.get("isDir") or not f.get("ref"):
+                continue
+            local = ctx.download(f["ref"])
+            poster_paths.append(str(local))
+
+        if not poster_paths:
+            raise ValueError("未找到素材图片：请先在文件选择器中选择图片，或授权素材目录")
 
         bg_path = poster_paths[0] if poster_paths else None
         assets = {
@@ -256,13 +377,13 @@ class Plugin(BasePlugin):
                 method="POST",
                 path=f"/Items/{target_id}/Images/Primary",
                 json=b64,
-            )
-            result["uploadStatus"] = resp["status"]
-            result["uploaded"] = resp["status"] in (200, 204)
+            ) or {}
+            result["uploadStatus"] = resp.get("status")
+            result["uploaded"] = resp.get("status") in (200, 204)
             if result["uploaded"]:
                 ctx.mt.log(level="info", message="封面已上传到 Emby")
             else:
-                ctx.mt.log(level="warning", message=f"上传返回 HTTP {resp['status']}")
+                ctx.mt.log(level="warn", message=f"上传返回 HTTP {resp.get('status')}")
 
         # 4. 保存预览
         if len(image_bytes) <= 8 * 1024 * 1024:
@@ -273,10 +394,7 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @query("preview")
     def preview(self, input: dict, ctx: Context):
-        data = ctx.mt.storage.get(key="preview")
-        if not data.get("found"):
-            return {}
-        return data.get("value") or {}
+        return _storage_value(ctx.mt.storage.get(key="preview")) or {}
 
     # ------------------------------------------------------------------ #
     def get_page(self, ctx: Context):
@@ -322,6 +440,7 @@ class Plugin(BasePlugin):
                     "input": {
                         "serverId": ui.ref("state.serverId"),
                         "targetId": ui.ref("state.targetId"),
+                        "libraryId": ui.ref("state.libraryId"),
                         "layout": ui.ref("state.layout"),
                         "titleSize": ui.ref("state.titleSize"),
                         "subtitleSize": ui.ref("state.subtitleSize"),
@@ -335,6 +454,7 @@ class Plugin(BasePlugin):
                 {"id": "servers", "name": "servers"},
                 {"id": "libraries", "name": "libraries"},
                 {"id": "items", "name": "items"},
+                {"id": "preview", "name": "preview"},
             ],
             state={
                 "serverId": None,
