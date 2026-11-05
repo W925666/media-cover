@@ -216,10 +216,11 @@ class Plugin(BasePlugin):
         return _storage_value(ctx.mt.storage.get(key="config")) or {}
 
     def _fetch_emby_posters(self, ctx: Context, server_id: str, library_id: str,
-                            direct: EmbyDirect, count: int = 9) -> list[str]:
+                            direct: EmbyDirect, count: int = 9) -> tuple[list[str], int]:
         """经 SDK 读同库条目（去重：作品名+年份只取一张），直连下载海报。
 
-        返回可交给 PosterEngine 的图片 URL 列表（引擎支持 http 直连下载）。
+        返回 (图片 URL 列表, 库总数)。库总数用于角标显示——角标必须是
+        媒体库的作品总数，不是取到的海报张数。
         """
         result = ctx.mt.emby.request(
             server_id=server_id, path="/Items",
@@ -229,7 +230,11 @@ class Plugin(BasePlugin):
                    "EnableTotalRecordCount": True},
         ) or {}
         if result.get("status") != 200 or not isinstance(result.get("data"), dict):
-            return []
+            return [], 0
+        try:
+            total = int(result["data"].get("TotalRecordCount") or 0)
+        except (TypeError, ValueError):
+            total = 0
         items = result["data"].get("Items", []) or []
         seen: set[str] = set()
         picked: list[str] = []
@@ -245,7 +250,7 @@ class Plugin(BasePlugin):
             picked.append(direct.image_url(str(it["Id"])))
             if len(picked) >= count:
                 break
-        return picked
+        return picked, (total or len(items))
 
     def _first_server_id(self, ctx: Context) -> str | None:
         """返回第一个已授权且启用的 Emby 服务器 ID，无则 None。"""
@@ -362,12 +367,13 @@ class Plugin(BasePlugin):
                             input.get("embyApiKey") or cfg.get("embyApiKey") or "")
         library_id = str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None
         poster_paths: list[str] = []
+        library_total = 0
         if direct.ok and library_id:
             try:
-                poster_paths = self._fetch_emby_posters(ctx, server_id, str(library_id), direct)
+                poster_paths, library_total = self._fetch_emby_posters(ctx, server_id, str(library_id), direct)
             except Exception as e:
                 ctx.mt.log(level="warn", message=f"Emby 海报获取失败，改用本地素材: {e}")
-                poster_paths = []
+                poster_paths, library_total = [], 0
 
         root_id = input.get("rootId")
         asset_path = input.get("path") or "."
@@ -402,7 +408,8 @@ class Plugin(BasePlugin):
             "posters": poster_paths,
             "backdrops": [],
             "poster_backdrops": [],
-            "count": len(poster_paths),
+            # 角标数字 = 媒体库作品总数（不是海报张数）
+            "count": library_total or len(poster_paths),
         }
         config: dict[str, Any] = {
             "engine": layout,
