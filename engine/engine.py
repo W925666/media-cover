@@ -809,7 +809,8 @@ class PosterEngine:
                 resized = final_frame.resize((target_w, target_h), Image.LANCZOS)
                 return idx, resized
 
-            worker_count = 4 if target_w >= 960 else 8
+            # 容器 worker 内存预算小，并行太多直接 OOM，限 2 线程
+            worker_count = 2
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
                 futures = [executor.submit(render_one_frame, i) for i in range(total_frames)]
                 for future in as_completed(futures):
