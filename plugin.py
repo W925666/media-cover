@@ -231,7 +231,7 @@ class Plugin(BasePlugin):
         return _storage_value(ctx.mt.storage.get(key="config")) or {}
 
     def _fetch_emby_posters(self, ctx: Context, server_id: str, library_id: str,
-                            direct: EmbyDirect, count: int = 9) -> tuple[list[str], int]:
+                            direct: EmbyDirect, count: int = 9) -> tuple[list[str], int, list[str]]:
         """经 SDK 读同库条目（去重：作品名+年份只取一张），直连下载海报。
 
         返回 (图片 URL 列表, 库总数)。库总数用于角标显示——角标必须是
