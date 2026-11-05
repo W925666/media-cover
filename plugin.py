@@ -303,16 +303,16 @@ class Plugin(BasePlugin):
             # 兜底：action 场景可以调 emby.request，自动取第一个媒体库，
             # 保证一键生成永远不会因为没选库而失败
             try:
-                res = ctx.mt.emby.request(
+                lib_res = ctx.mt.emby.request(
                     server_id=server_id, path="/Library/SelectableMediaFolders") or {}
-                rows = res.get("data") or [] if res.get("status") == 200 else []
-                first = next((r for r in rows if isinstance(r, dict) and r.get("Id") is not None), None)
+                lib_rows = lib_res.get("data") or [] if lib_res.get("status") == 200 else []
+                first = next((r for r in lib_rows if isinstance(r, dict) and r.get("Id") is not None), None)
                 if first:
                     target_id = str(first["Id"])
                     library_id_early = target_id
                     ctx.mt.log(level="warn", message=f"未选择媒体库，自动使用第一个：{first.get('Name')}")
                     try:
-                        ctx.mt.storage.set(key="libraries", value=_to_options(rows, "Name", "Id"))
+                        ctx.mt.storage.set(key="libraries", value=_to_options(lib_rows, "Name", "Id"))
                     except Exception:
                         pass
             except Exception as e:

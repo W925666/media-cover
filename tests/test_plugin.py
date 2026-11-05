@@ -114,8 +114,8 @@ def test_helpers():
 def test_queries_survive_empty_storage():
     p = plugin.Plugin()
     ctx = FakeCtx()
-    # libraries 查询实时经 SDK 读取（假 Emby 返回 1 个库）
-    assert p.libraries({}, ctx) == [{"label": "Movies", "value": "lib1"}]
+    # libraries 查询只读 storage 缓存（query 场景不允许 emby.request）
+    assert p.libraries({}, ctx) == []
     assert p.items({}, ctx) == []
     assert p.preview({}, ctx) == {}
 
