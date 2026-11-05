@@ -28,11 +28,18 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
 
 
 def _to_options(items: list, label_key: str, value_key: str) -> list[dict]:
-    return [
-        {"label": it.get(label_key) or "", "value": it.get(value_key)}
-        for it in (items or [])
-        if isinstance(it, dict)
-    ]
+    # ⚠️ Emby 的 Id 是数字（如 3、17381），但 inputSchema 声明为 string，
+    # 不转 str 会报 $.libraryId: Schema 须为 string
+    out = []
+    for it in items or []:
+        if not isinstance(it, dict):
+            continue
+        value = it.get(value_key)
+        out.append({
+            "label": it.get(label_key) or "",
+            "value": str(value) if value is not None else None,
+        })
+    return out
 
 
 def _parse_size(value: Any, default: int) -> int:
@@ -187,7 +194,7 @@ class Plugin(BasePlugin):
             name = it.get("Name") or ""
             year = it.get("ProductionYear")
             label = f"{name} ({year})" if year else name
-            opts.append({"label": label, "value": it.get("Id")})
+            opts.append({"label": label, "value": str(it.get("Id")) if it.get("Id") is not None else None})
         ctx.mt.storage.set(key="items", value=opts)
         ctx.mt.log(level="info", message=f"已加载 {len(opts)} 个条目")
         return {"count": len(opts)}
@@ -371,16 +378,51 @@ class Plugin(BasePlugin):
             "poster_backdrops": [],
             "count": len(poster_paths),
         }
-        config = {
+        config: dict[str, Any] = {
             "engine": layout,
             "title": title,
             "subtitle": subtitle,
-            "font_title": "OPPOSans-B.ttf",
-            "font_subtitle": "OPPOSans-B.ttf",
+            "font_title": input.get("fontTitle") or cfg.get("fontTitle") or "OPPOSans-B.ttf",
+            "font_subtitle": input.get("fontSubtitle") or cfg.get("fontSubtitle") or "OPPOSans-B.ttf",
             "title_size": title_size,
             "subtitle_size": subtitle_size,
             "enable_animation": False,
         }
+        # 字体/角标/排版等可选配置：页面或插件 config 里填了才透传，
+        # 引擎对不认识的布局会直接忽略多余键
+        _extra_str = [
+            "fontTitle", "fontSubtitle", "fontCount",
+            "titleColor", "subtitleColor",
+            "badgeStyle", "badgeFont", "badgeTextColor", "badgeBgColor",
+        ]
+        _extra_num = [
+            "badgeSize", "badgeXPercent", "badgeYPercent",
+            "badgeOpacity", "badgeBorderOpacity",
+            "titleOffsetY", "subtitleOffsetY",
+            "posterCount", "brightness", "blurRadius",
+            "fanRadius", "fanSpread", "centerScale", "sideScaleShrink",
+            "layoutYOffset",
+        ]
+        for key in _extra_str:
+            value = input.get(key)
+            if value not in (None, ""):
+                # camelCase 入参 -> snake_case 引擎键
+                snake = "".join(
+                    f"_{c.lower()}" if c.isupper() else c for c in key
+                ).lstrip("_")
+                config[snake] = value
+        for key in _extra_num:
+            value = input.get(key)
+            if value in (None, ""):
+                continue
+            try:
+                num = float(value)
+            except (TypeError, ValueError):
+                continue
+            snake = "".join(
+                f"_{c.lower()}" if c.isupper() else c for c in key
+            ).lstrip("_")
+            config[snake] = int(num) if num == int(num) else num
 
         ctx.mt.log(level="info", message=f"生成封面：标题={title}, 布局={layout}, 素材={len(poster_paths)} 张")
         b64 = self.engine().draw(config, assets)
@@ -417,6 +459,21 @@ class Plugin(BasePlugin):
         return _storage_value(ctx.mt.storage.get(key="preview")) or {}
 
     # ------------------------------------------------------------------ #
+    @query("fonts")
+    def fonts(self, input: dict, ctx: Context):
+        """内置字体列表（供页面字体下拉；引擎按文件名加载，找不到自动 fallback）。"""
+        import os as _os
+        fonts_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "fonts")
+        try:
+            names = sorted(
+                n for n in _os.listdir(fonts_dir)
+                if n.lower().endswith((".ttf", ".otf"))
+            )
+        except OSError:
+            return []
+        return [{"label": n, "value": n} for n in names]
+
+    # ------------------------------------------------------------------ #
     def get_page(self, ctx: Context):
         """一键生成页（对齐 cover-studio）：配置一次，之后只点一个按钮。
 
@@ -446,20 +503,122 @@ class Plugin(BasePlugin):
                         "serverId": ui.ref("state.serverId"),
                         "libraryId": ui.ref("state.libraryId"),
                         "layout": ui.ref("state.layout"),
+                        "fontTitle": ui.ref("state.fontTitle"),
+                        "fontSubtitle": ui.ref("state.fontSubtitle"),
+                        "titleSize": ui.ref("state.titleSize"),
+                        "subtitleSize": ui.ref("state.subtitleSize"),
+                        "titleColor": ui.ref("state.titleColor"),
+                        "subtitleColor": ui.ref("state.subtitleColor"),
+                        "titleOffsetY": ui.ref("state.titleOffsetY"),
+                        "subtitleOffsetY": ui.ref("state.subtitleOffsetY"),
+                        "posterCount": ui.ref("state.posterCount"),
+                        "brightness": ui.ref("state.brightness"),
+                        "blurRadius": ui.ref("state.blurRadius"),
+                        "badgeStyle": ui.ref("state.badgeStyle"),
+                        "badgeFont": ui.ref("state.badgeFont"),
+                        "badgeSize": ui.ref("state.badgeSize"),
+                        "badgeXPercent": ui.ref("state.badgeXPercent"),
+                        "badgeYPercent": ui.ref("state.badgeYPercent"),
+                        "badgeTextColor": ui.ref("state.badgeTextColor"),
+                        "badgeBgColor": ui.ref("state.badgeBgColor"),
+                        "badgeOpacity": ui.ref("state.badgeOpacity"),
+                        "badgeBorderOpacity": ui.ref("state.badgeBorderOpacity"),
+                        "fanRadius": ui.ref("state.fanRadius"),
+                        "fanSpread": ui.ref("state.fanSpread"),
+                        "centerScale": ui.ref("state.centerScale"),
+                        "sideScaleShrink": ui.ref("state.sideScaleShrink"),
+                        "layoutYOffset": ui.ref("state.layoutYOffset"),
                         "upload": True,
                     },
                 }]),
+            ),
+            ui.Card(
+                ui.Text(text="字体与排版：字体从内置字体库选，找不到时引擎自动用同目录其他字体兜底。"),
+                ui.Select(label="主标题字体", bind="state.fontTitle",
+                          options=ui.ref("query.fonts.data")),
+                ui.Select(label="副标题字体", bind="state.fontSubtitle",
+                          options=ui.ref("query.fonts.data")),
+                ui.Input(label="主标题字号", bind="state.titleSize", type="number"),
+                ui.Input(label="副标题字号", bind="state.subtitleSize", type="number"),
+                ui.Input(label="主标题颜色", bind="state.titleColor"),
+                ui.Input(label="副标题颜色", bind="state.subtitleColor"),
+                ui.Input(label="主标题垂直偏移", bind="state.titleOffsetY", type="number"),
+                ui.Input(label="副标题垂直偏移", bind="state.subtitleOffsetY", type="number"),
+            ),
+            ui.Card(
+                ui.Text(text="徽章（左上角数量角标）：样式 none=不显示，box/ribbon/circle 等见引擎。"),
+                ui.Select(label="徽章样式", bind="state.badgeStyle", options=[
+                    {"label": "不显示", "value": "none"},
+                    {"label": "圆角框", "value": "box"},
+                    {"label": "斜带", "value": "ribbon"},
+                    {"label": "圆环", "value": "circle"},
+                    {"label": "描边", "value": "outline"},
+                    {"label": "六边形", "value": "hexagon"},
+                    {"label": "票根", "value": "ticket"},
+                    {"label": "邮戳", "value": "stamp"},
+                    {"label": "故障风", "value": "glitch"},
+                    {"label": "波形", "value": "wave"},
+                    {"label": "爆发", "value": "burst"},
+                    {"label": "胶带", "value": "tape"},
+                    {"label": "分段", "value": "split"},
+                ]),
+                ui.Select(label="徽章字体", bind="state.badgeFont",
+                          options=ui.ref("query.fonts.data")),
+                ui.Input(label="徽章大小", bind="state.badgeSize", type="number"),
+                ui.Input(label="水平位置 %", bind="state.badgeXPercent", type="number"),
+                ui.Input(label="垂直位置 %", bind="state.badgeYPercent", type="number"),
+                ui.Input(label="文字配色", bind="state.badgeTextColor"),
+                ui.Input(label="图形配色", bind="state.badgeBgColor"),
+                ui.Input(label="背景透明度", bind="state.badgeOpacity", type="number"),
+                ui.Input(label="边框透明度", bind="state.badgeBorderOpacity", type="number"),
+            ),
+            ui.Card(
+                ui.Text(text="资源与扇形布局参数（其他布局自动忽略不认识的参数）。"),
+                ui.Input(label="海报数量", bind="state.posterCount", type="number"),
+                ui.Input(label="背景压暗程度 (0-1，如 0.7)", bind="state.brightness", type="number"),
+                ui.Input(label="背景模糊程度", bind="state.blurRadius", type="number"),
+                ui.Input(label="扇形半径 (曲率)", bind="state.fanRadius", type="number"),
+                ui.Input(label="扇形展开总角度", bind="state.fanSpread", type="number"),
+                ui.Input(label="C位海报大小", bind="state.centerScale", type="number"),
+                ui.Input(label="侧边缩小比例", bind="state.sideScaleShrink", type="number"),
+                ui.Input(label="海报整体垂直位置", bind="state.layoutYOffset", type="number"),
             ),
             ui.RunHistory(),
             ui.RunLog(),
             queries=[
                 {"id": "servers", "name": "servers"},
                 {"id": "libraries", "name": "libraries"},
+                {"id": "fonts", "name": "fonts"},
                 {"id": "preview", "name": "preview"},
             ],
             state={
                 "serverId": None,
                 "libraryId": None,
                 "layout": "经典九宫格",
+                "fontTitle": "OPPOSans-B.ttf",
+                "fontSubtitle": "OPPOSans-B.ttf",
+                "titleSize": 160,
+                "subtitleSize": 80,
+                "titleColor": "#FFFFFF",
+                "subtitleColor": "#AAAAAA",
+                "titleOffsetY": 0,
+                "subtitleOffsetY": 0,
+                "posterCount": 9,
+                "brightness": 0.7,
+                "blurRadius": 4,
+                "badgeStyle": "none",
+                "badgeFont": "OPPOSans-B.ttf",
+                "badgeSize": 90,
+                "badgeXPercent": 2,
+                "badgeYPercent": 3,
+                "badgeTextColor": "#FFFFFF",
+                "badgeBgColor": "#000000",
+                "badgeOpacity": 255,
+                "badgeBorderOpacity": 40,
+                "fanRadius": 1200,
+                "fanSpread": 40,
+                "centerScale": 0.55,
+                "sideScaleShrink": 0.95,
+                "layoutYOffset": 100,
             },
         )

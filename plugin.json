@@ -115,6 +115,78 @@
           },
           "upload": {
             "type": "boolean"
+          },
+          "fontTitle": {
+            "type": "string"
+          },
+          "fontSubtitle": {
+            "type": "string"
+          },
+          "fontCount": {
+            "type": "string"
+          },
+          "titleColor": {
+            "type": "string"
+          },
+          "subtitleColor": {
+            "type": "string"
+          },
+          "badgeStyle": {
+            "type": "string"
+          },
+          "badgeFont": {
+            "type": "string"
+          },
+          "badgeTextColor": {
+            "type": "string"
+          },
+          "badgeBgColor": {
+            "type": "string"
+          },
+          "badgeSize": {
+            "type": "integer"
+          },
+          "badgeOpacity": {
+            "type": "integer"
+          },
+          "badgeBorderOpacity": {
+            "type": "integer"
+          },
+          "titleOffsetY": {
+            "type": "integer"
+          },
+          "subtitleOffsetY": {
+            "type": "integer"
+          },
+          "posterCount": {
+            "type": "integer"
+          },
+          "blurRadius": {
+            "type": "integer"
+          },
+          "fanRadius": {
+            "type": "integer"
+          },
+          "fanSpread": {
+            "type": "integer"
+          },
+          "layoutYOffset": {
+            "type": "integer"
+          },
+          "badgeXPercent": {
+            "type": "number"
+          },
+          "badgeYPercent": {
+            "type": "number"
+          },
+          "brightness": {
+            "type": "number"
+          },
+          "centerScale": {
+            "type": "number"
+          },
+          "sideScaleShrink": {
+            "type": "number"
           }
         },
         "required": []
@@ -170,6 +242,14 @@
     {
       "id": "preview",
       "label": "最新预览",
+      "inputSchema": {
+        "type": "object"
+      },
+      "outputSchema": {}
+    },
+    {
+      "id": "fonts",
+      "label": "内置字体",
       "inputSchema": {
         "type": "object"
       },
