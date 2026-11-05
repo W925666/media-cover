@@ -216,10 +216,15 @@ def render(ctx, bg, config, assets, fonts):
     poster_urls = assets.get('posters', [])
     if not poster_urls: return bg
     
-    # 下载主图
+    # 下载主图（卡片用第一张海报；背景优先用独立的 backdrop，没有才退回同一张）
     original_img = ctx.download_img(poster_urls[0])
     if not original_img: return bg
     original_img = original_img.convert("RGB")
+    backdrop_urls = assets.get('backdrops') or assets.get('poster_backdrops') or []
+    bg_source = ctx.download_img(backdrop_urls[0]) if backdrop_urls else None
+    if bg_source is None:
+        bg_source = original_img
+    bg_source = bg_source.convert("RGB")
     
     width, height = bg.size
     
@@ -238,7 +243,7 @@ def render(ctx, bg, config, assets, fonts):
     color_ratio = float(config.get('color_ratio', 0.85))
     grain_val = float(config.get('grain_intensity', 0.05))
     
-    bg_img = original_img.copy()
+    bg_img = bg_source.copy()
     bg_img = ImageOps.fit(bg_img, (width, height), method=Image.LANCZOS)
     bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=blur_radius))
     

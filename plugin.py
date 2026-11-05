@@ -241,11 +241,11 @@ class Plugin(BasePlugin):
             server_id=server_id, path="/Items",
             query={"ParentId": library_id, "Recursive": True,
                    "IncludeItemTypes": "Movie,Series,BoxSet",
-                   "Fields": "ProductionYear,ImageTags", "Limit": 100,
+                   "Fields": "ProductionYear,ImageTags,BackdropImageTags", "Limit": 100,
                    "EnableTotalRecordCount": True},
         ) or {}
         if result.get("status") != 200 or not isinstance(result.get("data"), dict):
-            return [], 0
+            return [], 0, []
         try:
             total = int(result["data"].get("TotalRecordCount") or 0)
         except (TypeError, ValueError):
@@ -253,9 +253,14 @@ class Plugin(BasePlugin):
         items = result["data"].get("Items", []) or []
         seen: set[str] = set()
         picked: list[str] = []
+        backdrops: list[str] = []
         for it in items:
             if not isinstance(it, dict) or not it.get("Id"):
                 continue
+            # 背景图：用同库条目的 Backdrop（和主海报分开，底图不再是封面同一张）
+            bd_tags = it.get("BackdropImageTags") or []
+            if bd_tags:
+                backdrops.append(f"{direct.base}/Items/{it['Id']}/Images/Backdrop/0?MaxWidth=1280&Quality=90")
             if not (it.get("ImageTags") or {}).get("Primary"):
                 continue
             key = f"{str(it.get('Name') or '').strip().lower()}|{it.get('ProductionYear') or ''}"
@@ -263,9 +268,9 @@ class Plugin(BasePlugin):
                 continue
             seen.add(key)
             picked.append(direct.image_url(str(it["Id"])))
-            if len(picked) >= count:
+            if len(picked) >= count and len(backdrops) >= 3:
                 break
-        return picked, (total or len(items))
+        return picked, (total or len(items)), backdrops
 
     def _first_server_id(self, ctx: Context) -> str | None:
         """返回第一个已授权且启用的 Emby 服务器 ID，无则 None。"""
@@ -383,13 +388,14 @@ class Plugin(BasePlugin):
         # 自动选库时 input 里没有 libraryId，用自动选中的库取图
         library_id = library_id_early or (str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None)
         poster_paths: list[str] = []
+        backdrop_paths: list[str] = []
         library_total = 0
         if direct.ok and library_id:
             try:
-                poster_paths, library_total = self._fetch_emby_posters(ctx, server_id, str(library_id), direct)
+                poster_paths, library_total, backdrop_paths = self._fetch_emby_posters(ctx, server_id, str(library_id), direct)
             except Exception as e:
                 ctx.mt.log(level="warn", message=f"Emby 海报获取失败，改用本地素材: {e}")
-                poster_paths, library_total = [], 0
+                poster_paths, library_total, backdrop_paths = [], 0, []
 
         root_id = input.get("rootId")
         asset_path = input.get("path") or "."
@@ -422,8 +428,9 @@ class Plugin(BasePlugin):
         assets = {
             "bg_url": bg_path,
             "posters": poster_paths,
-            "backdrops": [],
-            "poster_backdrops": [],
+            # 背景图用真实 Backdrop（底图和主海报分开）
+            "backdrops": backdrop_paths,
+            "poster_backdrops": backdrop_paths,
             # 角标数字 = 媒体库作品总数（不是海报张数）
             "count": library_total or len(poster_paths),
         }
@@ -729,7 +736,6 @@ class Plugin(BasePlugin):
             ui.Card(
                 ui.Text(text="徽章：左上角数量角标，数字为媒体库总数。"),
                 ui.Select(label="徽章样式", bind="state.badgeStyle", options=[
-                    {"label": "不显示", "value": "none"},
                     {"label": "圆角框", "value": "box"},
                     {"label": "斜带", "value": "ribbon"},
                     {"label": "圆环", "value": "circle"},
@@ -742,6 +748,7 @@ class Plugin(BasePlugin):
                     {"label": "爆发", "value": "burst"},
                     {"label": "胶带", "value": "tape"},
                     {"label": "分段", "value": "split"},
+                    {"label": "不显示", "value": "none"},
                 ]),
                 ui.Select(label="徽章字体", bind="state.badgeFont",
                           options=ui.ref("query.fonts.data")),
