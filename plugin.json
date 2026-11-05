@@ -164,6 +164,9 @@
           },
           "sideScaleShrink": {
             "type": "number"
+          },
+          "templateName": {
+            "type": "string"
           }
         },
         "required": [],
@@ -212,6 +215,24 @@
         "additionalProperties": true
       },
       "outputSchema": {}
+    },
+    {
+      "id": "save-template",
+      "label": "保存当前为模板",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "layout": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": true
+      },
+      "outputSchema": {}
     }
   ],
   "queries": [
@@ -250,6 +271,14 @@
     {
       "id": "fonts",
       "label": "内置字体",
+      "inputSchema": {
+        "type": "object"
+      },
+      "outputSchema": {}
+    },
+    {
+      "id": "templates",
+      "label": "模板",
       "inputSchema": {
         "type": "object"
       },

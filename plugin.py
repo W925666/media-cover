@@ -411,16 +411,19 @@ class Plugin(BasePlugin):
             # 角标数字 = 媒体库作品总数（不是海报张数）
             "count": library_total or len(poster_paths),
         }
-        config: dict[str, Any] = {
+        # 模板：内置预设/用户模板作为底，页面显式入参覆盖
+        tpl_cfg = self._load_template(ctx, str(input.get("templateName") or ""))
+        config: dict[str, Any] = dict(tpl_cfg)
+        config.update({
             "engine": layout,
-            "title": title,
-            "subtitle": subtitle,
-            "font_title": input.get("fontTitle") or cfg.get("fontTitle") or "OPPOSans-B.ttf",
-            "font_subtitle": input.get("fontSubtitle") or cfg.get("fontSubtitle") or "OPPOSans-B.ttf",
+            "title": input.get("title") or title,
+            "subtitle": input.get("subtitle") or subtitle,
+            "font_title": input.get("fontTitle") or cfg.get("fontTitle") or config.get("font_title") or "OPPOSans-B.ttf",
+            "font_subtitle": input.get("fontSubtitle") or cfg.get("fontSubtitle") or config.get("font_subtitle") or "OPPOSans-B.ttf",
             "title_size": title_size,
             "subtitle_size": subtitle_size,
             "enable_animation": False,
-        }
+        })
         # 字体/角标/排版等可选配置：页面或插件 config 里填了才透传，
         # 引擎对不认识的布局会直接忽略多余键
         _extra_str = [
@@ -554,6 +557,62 @@ class Plugin(BasePlugin):
         return _storage_value(ctx.mt.storage.get(key="preview")) or {}
 
     # ------------------------------------------------------------------ #
+    @query("templates")
+    def templates(self, input: dict, ctx: Context):
+        """模板列表：内置预设（FrameBase defaults/templates）+ 用户保存的。"""
+        import json as _json
+        import os as _os
+        out: list[dict] = []
+        tpl_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "templates")
+        try:
+            for name in sorted(_os.listdir(tpl_dir)):
+                if not name.lower().endswith(".json"):
+                    continue
+                try:
+                    data = _json.load(open(_os.path.join(tpl_dir, name), encoding="utf-8"))
+                    out.append({"label": data.get("name") or name, "value": name})
+                except Exception:
+                    continue
+        except OSError:
+            pass
+        for t in _storage_value(ctx.mt.storage.get(key="templates")) or []:
+            if isinstance(t, dict) and t.get("name"):
+                out.append({"label": str(t["name"]), "value": str(t["name"])})
+        return out
+
+    def _load_template(self, ctx: Context, name: str) -> dict:
+        """按模板名加载配置：优先用户保存的，其次内置预设 JSON。"""
+        import json as _json
+        import os as _os
+        if not name:
+            return {}
+        for t in _storage_value(ctx.mt.storage.get(key="templates")) or []:
+            if isinstance(t, dict) and str(t.get("name")) == name:
+                cfg = t.get("config")
+                return dict(cfg) if isinstance(cfg, dict) else {}
+        tpl_path = _os.path.join(
+            _os.path.dirname(_os.path.abspath(__file__)), "templates", name)
+        try:
+            data = _json.load(open(tpl_path, encoding="utf-8"))
+            cfg = data.get("config")
+            return dict(cfg) if isinstance(cfg, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    @action("save-template")
+    def save_template(self, input: dict, ctx: Context):
+        """保存当前页面参数为模板（对齐 FrameBase 的保存当前/另存为）。"""
+        name = str((input or {}).get("name") or "").strip()
+        if not name:
+            raise ValueError("模板名不能为空")
+        cfg = {k: v for k, v in (input or {}).items() if k not in ("name", "serverId", "libraryId", "upload")}
+        saved = _storage_value(ctx.mt.storage.get(key="templates")) or []
+        saved = [t for t in saved if not (isinstance(t, dict) and t.get("name") == name)]
+        saved.append({"name": name, "config": cfg})
+        ctx.mt.storage.set(key="templates", value=saved)
+        return {"ok": True, "name": name}
+
+    # ------------------------------------------------------------------ #
     @query("fonts")
     def fonts(self, input: dict, ctx: Context):
         """内置字体列表（供页面字体下拉；引擎按文件名加载，找不到自动 fallback）。"""
@@ -581,6 +640,8 @@ class Plugin(BasePlugin):
                 ui.Text(text="配置好 Emby 地址和 API Key 后，选好媒体库点一键生成即可。"),
                 ui.Select(label="媒体库", bind="state.libraryId",
                           options=ui.ref("query.libraries.data")),
+                ui.Select(label="模板", bind="state.templateName",
+                          options=ui.ref("query.templates.data")),
                 ui.Button(label="加载媒体库", onClick=[{
                     "type": "invoke", "actionId": "load-libraries",
                     "input": {"serverId": ui.ref("state.serverId")},
@@ -607,6 +668,29 @@ class Plugin(BasePlugin):
                         "badgeStyle": ui.ref("state.badgeStyle"),
                         "badgeFont": ui.ref("state.badgeFont"),
                         "badgeSize": ui.ref("state.badgeSize"),
+                        "templateName": ui.ref("state.templateName"),
+                        "title": ui.ref("state.title"),
+                        "subtitle": ui.ref("state.subtitle"),
+                        "titleSize": ui.ref("state.titleSize"),
+                        "subtitleSize": ui.ref("state.subtitleSize"),
+                        "titleColor": ui.ref("state.titleColor"),
+                        "subtitleColor": ui.ref("state.subtitleColor"),
+                        "titleOffsetY": ui.ref("state.titleOffsetY"),
+                        "subtitleOffsetY": ui.ref("state.subtitleOffsetY"),
+                        "posterCount": ui.ref("state.posterCount"),
+                        "brightness": ui.ref("state.brightness"),
+                        "blurRadius": ui.ref("state.blurRadius"),
+                        "badgeXPercent": ui.ref("state.badgeXPercent"),
+                        "badgeYPercent": ui.ref("state.badgeYPercent"),
+                        "badgeTextColor": ui.ref("state.badgeTextColor"),
+                        "badgeBgColor": ui.ref("state.badgeBgColor"),
+                        "badgeOpacity": ui.ref("state.badgeOpacity"),
+                        "badgeBorderOpacity": ui.ref("state.badgeBorderOpacity"),
+                        "fanRadius": ui.ref("state.fanRadius"),
+                        "fanSpread": ui.ref("state.fanSpread"),
+                        "centerScale": ui.ref("state.centerScale"),
+                        "sideScaleShrink": ui.ref("state.sideScaleShrink"),
+                        "layoutYOffset": ui.ref("state.layoutYOffset"),
                         "upload": True,
                     },
                 }]),
@@ -623,11 +707,33 @@ class Plugin(BasePlugin):
                 }]),
             ),
             ui.Card(
-                ui.Text(text="字体：从内置字体库选，找不到时引擎自动用同目录其他字体兜底。"),
+                ui.Text(text="资源与内容：标题留空则自动取库名/年份。"),
+                ui.Input(label="主标题内容", bind="state.title"),
+                ui.Input(label="副标题内容", bind="state.subtitle"),
+                ui.Input(label="海报数量", bind="state.posterCount", type="number"),
+                ui.Input(label="背景压暗程度 (0-1)", bind="state.brightness", type="number"),
+                ui.Input(label="背景模糊程度", bind="state.blurRadius", type="number"),
+                ui.Input(label="扇形半径 (曲率)", bind="state.fanRadius", type="number"),
+                ui.Input(label="扇形展开总角度", bind="state.fanSpread", type="number"),
+                ui.Input(label="C位海报大小", bind="state.centerScale", type="number"),
+                ui.Input(label="侧边缩小比例", bind="state.sideScaleShrink", type="number"),
+                ui.Input(label="海报整体垂直位置", bind="state.layoutYOffset", type="number"),
+            ),
+            ui.Card(
+                ui.Text(text="字体与排版：字体从内置字体库选，找不到时引擎自动用同目录其他字体兜底。"),
                 ui.Select(label="主标题字体", bind="state.fontTitle",
                           options=ui.ref("query.fonts.data")),
                 ui.Select(label="副标题字体", bind="state.fontSubtitle",
                           options=ui.ref("query.fonts.data")),
+                ui.Input(label="主标题字号", bind="state.titleSize", type="number"),
+                ui.Input(label="副标题字号", bind="state.subtitleSize", type="number"),
+                ui.Input(label="主标题颜色", bind="state.titleColor"),
+                ui.Input(label="副标题颜色", bind="state.subtitleColor"),
+                ui.Input(label="主标题垂直偏移", bind="state.titleOffsetY", type="number"),
+                ui.Input(label="副标题垂直偏移", bind="state.subtitleOffsetY", type="number"),
+            ),
+            ui.Card(
+                ui.Text(text="徽章：左上角数量角标，数字为媒体库总数。"),
                 ui.Select(label="徽章样式", bind="state.badgeStyle", options=[
                     {"label": "不显示", "value": "none"},
                     {"label": "圆角框", "value": "box"},
@@ -646,6 +752,27 @@ class Plugin(BasePlugin):
                 ui.Select(label="徽章字体", bind="state.badgeFont",
                           options=ui.ref("query.fonts.data")),
                 ui.Input(label="徽章大小", bind="state.badgeSize", type="number"),
+                ui.Input(label="水平位置 %", bind="state.badgeXPercent", type="number"),
+                ui.Input(label="垂直位置 %", bind="state.badgeYPercent", type="number"),
+                ui.Input(label="文字配色", bind="state.badgeTextColor"),
+                ui.Input(label="图形配色", bind="state.badgeBgColor"),
+                ui.Input(label="背景透明度", bind="state.badgeOpacity", type="number"),
+                ui.Input(label="边框透明度", bind="state.badgeBorderOpacity", type="number"),
+                ui.Input(label="模板名（保存当前参数）", bind="state.templateSaveName"),
+                ui.Button(label="保存当前为模板", onClick=[{
+                    "type": "invoke", "actionId": "save-template",
+                    "input": {
+                        "name": ui.ref("state.templateSaveName"),
+                        "layout": ui.ref("state.layout"),
+                        "fontTitle": ui.ref("state.fontTitle"),
+                        "fontSubtitle": ui.ref("state.fontSubtitle"),
+                        "badgeStyle": ui.ref("state.badgeStyle"),
+                        "badgeFont": ui.ref("state.badgeFont"),
+                        "badgeSize": ui.ref("state.badgeSize"),
+                        "titleSize": ui.ref("state.titleSize"),
+                        "subtitleSize": ui.ref("state.subtitleSize"),
+                    },
+                }]),
             ),
             ui.RunHistory(),
             ui.RunLog(),
@@ -653,16 +780,41 @@ class Plugin(BasePlugin):
                 {"id": "servers", "name": "servers"},
                 {"id": "libraries", "name": "libraries"},
                 {"id": "fonts", "name": "fonts"},
+                {"id": "templates", "name": "templates"},
                 {"id": "preview", "name": "preview"},
             ],
             state={
                 "serverId": None,
                 "libraryId": None,
+                "templateName": None,
+                "templateSaveName": "",
+                "title": "",
+                "subtitle": "",
                 "layout": "经典九宫格",
-                "fontTitle": "OPPOSans-B.ttf",
-                "fontSubtitle": "OPPOSans-B.ttf",
+                "fontTitle": "剑豪体.ttf",
+                "fontSubtitle": "剑豪体.ttf",
+                "titleSize": 160,
+                "subtitleSize": 80,
+                "titleColor": "#FFFFFF",
+                "subtitleColor": "#AAAAAA",
+                "titleOffsetY": 0,
+                "subtitleOffsetY": 0,
+                "posterCount": 9,
+                "brightness": 0.7,
+                "blurRadius": 4,
                 "badgeStyle": "box",
-                "badgeFont": "OPPOSans-B.ttf",
+                "badgeFont": "剑豪体.ttf",
                 "badgeSize": 90,
+                "badgeXPercent": 2,
+                "badgeYPercent": 3,
+                "badgeTextColor": "#FFFFFF",
+                "badgeBgColor": "#0F172A",
+                "badgeOpacity": 0,
+                "badgeBorderOpacity": 30,
+                "fanRadius": 1200,
+                "fanSpread": 40,
+                "centerScale": 0.55,
+                "sideScaleShrink": 0.95,
+                "layoutYOffset": 100,
             },
         )

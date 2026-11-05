@@ -6,4 +6,4 @@ dependencies=["pillow==11.1.0"]
 [tool.uv]
 package=false
 [tool.mt-plugin]
-include=["plugin.py","plugin.json","pyproject.toml","uv.lock","engine","layouts","fonts"]
+include=["plugin.py","plugin.json","pyproject.toml","uv.lock","engine","layouts","fonts","templates"]
