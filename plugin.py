@@ -438,8 +438,11 @@ class Plugin(BasePlugin):
             "title_size": title_size,
             "subtitle_size": subtitle_size,
             # 动态布局（文件名含"动态"）开启动画，引擎输出 GIF
+            # 容器 worker 内存预算小，帧数必须压低，否则 worker 被 OOM 杀掉
             "enable_animation": "动态" in layout,
             "anim_duration": 100,
+            "poster_count": 4,
+            "switch_interval": 1000,
         })
         # 字体/角标/排版等可选配置：页面或插件 config 里填了才透传，
         # 引擎对不认识的布局会直接忽略多余键
