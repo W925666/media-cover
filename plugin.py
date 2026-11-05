@@ -153,7 +153,8 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @action("load-libraries")
     def load_libraries(self, input: dict, ctx: Context):
-        server_id = input.get("serverId") or self._first_server_id(ctx)
+        _sid = input.get("serverId")
+        server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
         if not server_id:
             raise ValueError("请先在设置中授权 Emby 服务器")
         result = ctx.mt.emby.request(
@@ -173,8 +174,9 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @action("load-items")
     def load_items(self, input: dict, ctx: Context):
-        server_id = input.get("serverId") or self._first_server_id(ctx)
-        library_id = input.get("libraryId")
+        _sid = input.get("serverId")
+        server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
+        library_id = str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None
         if not server_id or not library_id:
             raise ValueError("请先选择服务器和媒体库")
         q: dict[str, Any] = {
@@ -256,8 +258,9 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @action("probe-image")
     def probe_image(self, input: dict, ctx: Context):
-        server_id = input.get("serverId") or self._first_server_id(ctx)
-        item_id = input.get("itemId")
+        _sid = input.get("serverId")
+        server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
+        item_id = str(input.get("itemId")) if input.get("itemId") not in (None, "") else None
         if not server_id:
             raise ValueError("请先在设置中授权 Emby 服务器")
         if not item_id:
@@ -293,8 +296,9 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @action("generate-cover")
     def generate_cover(self, input: dict, ctx: Context):
-        server_id = input.get("serverId") or self._first_server_id(ctx)
-        target_id = input.get("targetId")
+        _sid = input.get("serverId")
+        server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
+        target_id = str(input.get("targetId")) if input.get("targetId") not in (None, "") else None
         layout = input.get("layout") or "经典九宫格"
         title_size = _parse_size(input.get("titleSize"), 160)
         subtitle_size = _parse_size(input.get("subtitleSize"), 80)
@@ -303,7 +307,7 @@ class Plugin(BasePlugin):
         if not server_id:
             raise ValueError("请先在设置中授权 Emby 服务器")
         # 一键模式：不选条目时直接给媒体库生成封面（target = libraryId）
-        library_id_early = input.get("libraryId")
+        library_id_early = str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None
         if not target_id:
             target_id = library_id_early
         if not target_id:
@@ -334,7 +338,7 @@ class Plugin(BasePlugin):
         cfg = self._plugin_config(ctx)
         direct = EmbyDirect(input.get("embyUrl") or cfg.get("embyUrl") or "",
                             input.get("embyApiKey") or cfg.get("embyApiKey") or "")
-        library_id = input.get("libraryId")
+        library_id = str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None
         poster_paths: list[str] = []
         if direct.ok and library_id:
             try:

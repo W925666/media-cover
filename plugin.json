@@ -44,12 +44,9 @@
       "fields": [],
       "inputSchema": {
         "type": "object",
-        "properties": {
-          "serverId": {
-            "type": "string"
-          }
-        },
-        "required": []
+        "properties": {},
+        "required": [],
+        "additionalProperties": true
       },
       "outputSchema": {}
     },
@@ -59,17 +56,9 @@
       "fields": [],
       "inputSchema": {
         "type": "object",
-        "properties": {
-          "serverId": {
-            "type": "string"
-          },
-          "libraryId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "libraryId"
-        ]
+        "properties": {},
+        "required": [],
+        "additionalProperties": true
       },
       "outputSchema": {}
     },
@@ -80,12 +69,6 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "serverId": {
-            "type": "string"
-          },
-          "targetId": {
-            "type": "string"
-          },
           "title": {
             "type": "string"
           },
@@ -98,16 +81,10 @@
           "subtitleSize": {
             "type": "integer"
           },
-          "libraryId": {
-            "type": "string"
-          },
           "embyUrl": {
             "type": "string"
           },
           "embyApiKey": {
-            "type": "string"
-          },
-          "rootId": {
             "type": "string"
           },
           "path": {
@@ -189,7 +166,8 @@
             "type": "number"
           }
         },
-        "required": []
+        "required": [],
+        "additionalProperties": true
       },
       "outputSchema": {}
     },
@@ -199,17 +177,9 @@
       "fields": [],
       "inputSchema": {
         "type": "object",
-        "properties": {
-          "serverId": {
-            "type": "string"
-          },
-          "itemId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "itemId"
-        ]
+        "properties": {},
+        "required": [],
+        "additionalProperties": true
       },
       "outputSchema": {}
     }
