@@ -442,8 +442,11 @@ class Plugin(BasePlugin):
             # 容器 worker 内存预算小，帧数必须压低，否则 worker 被 OOM 杀掉
             "enable_animation": "动态" in layout,
             "anim_duration": 100,
-            "poster_count": 4,
-            "switch_interval": 1000,
+            # 对齐 FrameBase 旋转动态预设：2500ms 轮换、3 张海报、过渡旋转 38 度
+            "poster_count": 3,
+            "switch_interval": 2500,
+            "transition_ms": 900,
+            "transition_spin": 38,
         })
         # 旋转布局：原版 angle_top=0（主卡不转、只有背后模糊卡歪着，看起来没转），
         # 这里把角度调大，主卡肉眼可见地斜着
