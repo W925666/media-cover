@@ -445,6 +445,12 @@ class Plugin(BasePlugin):
             "poster_count": 4,
             "switch_interval": 1000,
         })
+        # 旋转布局：原版 angle_top=0（主卡不转、只有背后模糊卡歪着，看起来没转），
+        # 这里把角度调大，主卡肉眼可见地斜着
+        if layout == "旋转" and not input.get("templateName"):
+            config["angle_top"] = 15
+            config["angle_mid"] = 28
+            config["angle_bot"] = 42
         # 字体/角标/排版等可选配置：页面或插件 config 里填了才透传，
         # 引擎对不认识的布局会直接忽略多余键
         _extra_str = [
