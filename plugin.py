@@ -122,23 +122,12 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @query("libraries")
     def libraries(self, input: dict, ctx: Context):
-        """实时经 SDK 读媒体库（参考 cover-studio 的 status 查询做法）；
-        失败时退回 load-libraries 写入的 storage 缓存。"""
-        server_id = (input or {}).get("serverId") or self._first_server_id(ctx)
-        if server_id:
-            try:
-                result = ctx.mt.emby.request(
-                    server_id=server_id, path="/Library/SelectableMediaFolders") or {}
-                if result.get("status") == 200:
-                    opts = _to_options(result.get("data") or [], "Name", "Id")
-                    if opts:
-                        try:
-                            ctx.mt.storage.set(key="libraries", value=opts)
-                        except Exception:
-                            pass
-                        return opts
-            except Exception as e:
-                ctx.mt.log(level="warn", message=f"实时读取媒体库失败，改用缓存: {e}")
+        """读 load-libraries 动作写入的 storage 缓存。
+
+        ⚠️ query 场景不允许 emby.request（实测 CONTEXT_DENIED），
+        所以库列表只能由 action 写入缓存，query 只读缓存。
+        页面上有「加载媒体库」按钮先点一次把缓存填上。
+        """
         return _storage_value(ctx.mt.storage.get(key="libraries")) or []
 
     # ------------------------------------------------------------------ #
@@ -310,6 +299,24 @@ class Plugin(BasePlugin):
         library_id_early = str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None
         if not target_id:
             target_id = library_id_early
+        if not target_id:
+            # 兜底：action 场景可以调 emby.request，自动取第一个媒体库，
+            # 保证一键生成永远不会因为没选库而失败
+            try:
+                res = ctx.mt.emby.request(
+                    server_id=server_id, path="/Library/SelectableMediaFolders") or {}
+                rows = res.get("data") or [] if res.get("status") == 200 else []
+                first = next((r for r in rows if isinstance(r, dict) and r.get("Id") is not None), None)
+                if first:
+                    target_id = str(first["Id"])
+                    library_id_early = target_id
+                    ctx.mt.log(level="warn", message=f"未选择媒体库，自动使用第一个：{first.get('Name')}")
+                    try:
+                        ctx.mt.storage.set(key="libraries", value=_to_options(rows, "Name", "Id"))
+                    except Exception:
+                        pass
+            except Exception as e:
+                ctx.mt.log(level="warn", message=f"自动取媒体库失败: {e}")
         if not target_id:
             raise ValueError("请先选择媒体库")
 
@@ -503,6 +510,10 @@ class Plugin(BasePlugin):
                 ui.Text(text="配置好 Emby 地址和 API Key 后，选好媒体库点一键生成即可。"),
                 ui.Select(label="媒体库", bind="state.libraryId",
                           options=ui.ref("query.libraries.data")),
+                ui.Button(label="加载媒体库", onClick=[{
+                    "type": "invoke", "actionId": "load-libraries",
+                    "input": {"serverId": ui.ref("state.serverId")},
+                }]),
                 ui.Select(label="布局模板", bind="state.layout", options=[
                     {"label": "经典九宫格", "value": "经典九宫格"},
                     {"label": "经典堆叠", "value": "经典堆叠"},
