@@ -182,6 +182,36 @@
         "additionalProperties": true
       },
       "outputSchema": {}
+    },
+    {
+      "id": "generate-all",
+      "label": "一键生成全部媒体库",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "layout": {
+            "type": "string"
+          },
+          "fontTitle": {
+            "type": "string"
+          },
+          "fontSubtitle": {
+            "type": "string"
+          },
+          "badgeStyle": {
+            "type": "string"
+          },
+          "badgeFont": {
+            "type": "string"
+          },
+          "badgeSize": {
+            "type": "integer"
+          }
+        },
+        "required": [],
+        "additionalProperties": true
+      },
+      "outputSchema": {}
     }
   ],
   "queries": [

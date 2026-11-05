@@ -509,6 +509,43 @@ class Plugin(BasePlugin):
         return result
 
     # ------------------------------------------------------------------ #
+    @action("generate-all")
+    def generate_all(self, input: dict, ctx: Context):
+        """一键生成全部媒体库（参考 cover-studio 的 generate 动作）。
+
+        遍历全部媒体库逐个生成并上传，返回汇总；单个库失败不中断整体。
+        """
+        server_id = self._first_server_id(ctx)
+        if not server_id:
+            raise ValueError("请先在设置中授权 Emby 服务器")
+        result = ctx.mt.emby.request(
+            server_id=server_id, path="/Library/SelectableMediaFolders") or {}
+        rows = result.get("data") or [] if result.get("status") == 200 else []
+        libs = [r for r in rows if isinstance(r, dict) and r.get("Id") is not None]
+        if not libs:
+            raise ValueError("未读取到媒体库")
+        ctx.mt.log(level="info", message=f"开始批量生成，共 {len(libs)} 个媒体库")
+        results: list[dict] = []
+        for lib in libs:
+            entry: dict[str, Any] = {"libraryId": str(lib["Id"]), "library": lib.get("Name") or ""}
+            try:
+                one = self.generate_cover({
+                    **(input or {}),
+                    "serverId": server_id,
+                    "libraryId": str(lib["Id"]),
+                    "upload": True,
+                }, ctx)
+                entry.update({"status": "uploaded" if one.get("uploaded") else "generated",
+                              "size": one.get("size", 0)})
+            except Exception as e:
+                entry.update({"status": "failed", "error": str(e)[:200]})
+                ctx.mt.log(level="warn", message=f"媒体库 {entry['library']} 生成失败: {e}")
+            results.append(entry)
+        ok = sum(1 for r in results if r["status"] == "uploaded")
+        return {"ok": True, "total": len(results), "uploaded": ok,
+                "failed": len(results) - ok, "results": results}
+
+    # ------------------------------------------------------------------ #
     @query("preview")
     def preview(self, input: dict, ctx: Context):
         return _storage_value(ctx.mt.storage.get(key="preview")) or {}
@@ -568,6 +605,17 @@ class Plugin(BasePlugin):
                         "badgeFont": ui.ref("state.badgeFont"),
                         "badgeSize": ui.ref("state.badgeSize"),
                         "upload": True,
+                    },
+                }]),
+                ui.Button(label="🚀 一键生成全部媒体库", onClick=[{
+                    "type": "invoke", "actionId": "generate-all",
+                    "input": {
+                        "layout": ui.ref("state.layout"),
+                        "fontTitle": ui.ref("state.fontTitle"),
+                        "fontSubtitle": ui.ref("state.fontSubtitle"),
+                        "badgeStyle": ui.ref("state.badgeStyle"),
+                        "badgeFont": ui.ref("state.badgeFont"),
+                        "badgeSize": ui.ref("state.badgeSize"),
                     },
                 }]),
             ),
