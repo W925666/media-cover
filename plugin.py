@@ -91,15 +91,30 @@ class EmbyDirect:
         except Exception:
             return None
 
+    @staticmethod
+    def _image_mime(data: bytes) -> str | None:
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            return "image/png"
+        if data[:2] == b"\xff\xd8":
+            return "image/jpeg"
+        if data[:6] in (b"GIF87a", b"GIF89a"):
+            return "image/gif"
+        if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            return "image/webp"
+        return None
+
     def upload_image(self, item_id: str, img: bytes) -> bool:
         """写回 Emby Primary 图：body 必须是 base64 字符串（不是二进制，
         Emby 文档写的 binary 是错的）。走直连绕开宿主 256 KiB JSON 体限制。"""
+        mime = self._image_mime(img)
+        if not mime:
+            return False
         try:
             url = f"{self.base}/Items/{item_id}/Images/Primary"
             payload = base64.b64encode(img)
             req = urllib.request.Request(
                 url, data=payload, method="POST",
-                headers={"X-Emby-Token": self.key, "Content-Type": "image/jpeg"},
+                headers={"X-Emby-Token": self.key, "Content-Type": mime},
             )
             with urllib.request.urlopen(req, timeout=60) as resp:
                 return 200 <= resp.status < 300
@@ -422,7 +437,9 @@ class Plugin(BasePlugin):
             "font_subtitle": input.get("fontSubtitle") or cfg.get("fontSubtitle") or config.get("font_subtitle") or "OPPOSans-B.ttf",
             "title_size": title_size,
             "subtitle_size": subtitle_size,
-            "enable_animation": False,
+            # 动态布局（文件名含"动态"）开启动画，引擎输出 GIF
+            "enable_animation": "动态" in layout,
+            "anim_duration": 100,
         })
         # 字体/角标/排版等可选配置：页面或插件 config 里填了才透传，
         # 引擎对不认识的布局会直接忽略多余键
@@ -644,7 +661,6 @@ class Plugin(BasePlugin):
                           options=ui.ref("query.templates.data")),
                 ui.Button(label="加载媒体库", onClick=[{
                     "type": "invoke", "actionId": "load-libraries",
-                    "input": {"serverId": ui.ref("state.serverId")},
                 }]),
                 ui.Select(label="布局模板", bind="state.layout", options=[
                     {"label": "经典九宫格", "value": "经典九宫格"},
@@ -656,6 +672,12 @@ class Plugin(BasePlugin):
                     {"label": "斜线分割", "value": "斜线分割"},
                     {"label": "自由设计", "value": "自由设计"},
                     {"label": "旋转", "value": "旋转"},
+                    {"label": "经典九宫格(动态)", "value": "经典九宫格(动态)"},
+                    {"label": "经典堆叠(动态)", "value": "经典堆叠(动态)"},
+                    {"label": "经典平铺(动态)", "value": "经典平铺(动态)"},
+                    {"label": "扇形展开(动态)", "value": "扇形展开(动态)"},
+                    {"label": "旋转(动态)", "value": "旋转(动态)"},
+                    {"label": "聚焦(动态)", "value": "聚焦(动态)"},
                 ]),
                 ui.Button(label="🚀 一键生成封面", onClick=[{
                     "type": "invoke", "actionId": "generate-cover",
@@ -669,28 +691,6 @@ class Plugin(BasePlugin):
                         "badgeFont": ui.ref("state.badgeFont"),
                         "badgeSize": ui.ref("state.badgeSize"),
                         "templateName": ui.ref("state.templateName"),
-                        "title": ui.ref("state.title"),
-                        "subtitle": ui.ref("state.subtitle"),
-                        "titleSize": ui.ref("state.titleSize"),
-                        "subtitleSize": ui.ref("state.subtitleSize"),
-                        "titleColor": ui.ref("state.titleColor"),
-                        "subtitleColor": ui.ref("state.subtitleColor"),
-                        "titleOffsetY": ui.ref("state.titleOffsetY"),
-                        "subtitleOffsetY": ui.ref("state.subtitleOffsetY"),
-                        "posterCount": ui.ref("state.posterCount"),
-                        "brightness": ui.ref("state.brightness"),
-                        "blurRadius": ui.ref("state.blurRadius"),
-                        "badgeXPercent": ui.ref("state.badgeXPercent"),
-                        "badgeYPercent": ui.ref("state.badgeYPercent"),
-                        "badgeTextColor": ui.ref("state.badgeTextColor"),
-                        "badgeBgColor": ui.ref("state.badgeBgColor"),
-                        "badgeOpacity": ui.ref("state.badgeOpacity"),
-                        "badgeBorderOpacity": ui.ref("state.badgeBorderOpacity"),
-                        "fanRadius": ui.ref("state.fanRadius"),
-                        "fanSpread": ui.ref("state.fanSpread"),
-                        "centerScale": ui.ref("state.centerScale"),
-                        "sideScaleShrink": ui.ref("state.sideScaleShrink"),
-                        "layoutYOffset": ui.ref("state.layoutYOffset"),
                         "upload": True,
                     },
                 }]),
@@ -707,30 +707,11 @@ class Plugin(BasePlugin):
                 }]),
             ),
             ui.Card(
-                ui.Text(text="资源与内容：标题留空则自动取库名/年份。"),
-                ui.Input(label="主标题内容", bind="state.title"),
-                ui.Input(label="副标题内容", bind="state.subtitle"),
-                ui.Input(label="海报数量", bind="state.posterCount", type="number"),
-                ui.Input(label="背景压暗程度 (0-1)", bind="state.brightness", type="number"),
-                ui.Input(label="背景模糊程度", bind="state.blurRadius", type="number"),
-                ui.Input(label="扇形半径 (曲率)", bind="state.fanRadius", type="number"),
-                ui.Input(label="扇形展开总角度", bind="state.fanSpread", type="number"),
-                ui.Input(label="C位海报大小", bind="state.centerScale", type="number"),
-                ui.Input(label="侧边缩小比例", bind="state.sideScaleShrink", type="number"),
-                ui.Input(label="海报整体垂直位置", bind="state.layoutYOffset", type="number"),
-            ),
-            ui.Card(
                 ui.Text(text="字体与排版：字体从内置字体库选，找不到时引擎自动用同目录其他字体兜底。"),
                 ui.Select(label="主标题字体", bind="state.fontTitle",
                           options=ui.ref("query.fonts.data")),
                 ui.Select(label="副标题字体", bind="state.fontSubtitle",
                           options=ui.ref("query.fonts.data")),
-                ui.Input(label="主标题字号", bind="state.titleSize", type="number"),
-                ui.Input(label="副标题字号", bind="state.subtitleSize", type="number"),
-                ui.Input(label="主标题颜色", bind="state.titleColor"),
-                ui.Input(label="副标题颜色", bind="state.subtitleColor"),
-                ui.Input(label="主标题垂直偏移", bind="state.titleOffsetY", type="number"),
-                ui.Input(label="副标题垂直偏移", bind="state.subtitleOffsetY", type="number"),
             ),
             ui.Card(
                 ui.Text(text="徽章：左上角数量角标，数字为媒体库总数。"),
@@ -752,27 +733,7 @@ class Plugin(BasePlugin):
                 ui.Select(label="徽章字体", bind="state.badgeFont",
                           options=ui.ref("query.fonts.data")),
                 ui.Input(label="徽章大小", bind="state.badgeSize", type="number"),
-                ui.Input(label="水平位置 %", bind="state.badgeXPercent", type="number"),
-                ui.Input(label="垂直位置 %", bind="state.badgeYPercent", type="number"),
-                ui.Input(label="文字配色", bind="state.badgeTextColor"),
-                ui.Input(label="图形配色", bind="state.badgeBgColor"),
-                ui.Input(label="背景透明度", bind="state.badgeOpacity", type="number"),
-                ui.Input(label="边框透明度", bind="state.badgeBorderOpacity", type="number"),
-                ui.Input(label="模板名（保存当前参数）", bind="state.templateSaveName"),
-                ui.Button(label="保存当前为模板", onClick=[{
-                    "type": "invoke", "actionId": "save-template",
-                    "input": {
-                        "name": ui.ref("state.templateSaveName"),
-                        "layout": ui.ref("state.layout"),
-                        "fontTitle": ui.ref("state.fontTitle"),
-                        "fontSubtitle": ui.ref("state.fontSubtitle"),
-                        "badgeStyle": ui.ref("state.badgeStyle"),
-                        "badgeFont": ui.ref("state.badgeFont"),
-                        "badgeSize": ui.ref("state.badgeSize"),
-                        "titleSize": ui.ref("state.titleSize"),
-                        "subtitleSize": ui.ref("state.subtitleSize"),
-                    },
-                }]),
+
             ),
             ui.RunHistory(),
             ui.RunLog(),
@@ -787,34 +748,11 @@ class Plugin(BasePlugin):
                 "serverId": None,
                 "libraryId": None,
                 "templateName": None,
-                "templateSaveName": "",
-                "title": "",
-                "subtitle": "",
-                "layout": "经典九宫格",
+                                                                "layout": "经典九宫格",
                 "fontTitle": "剑豪体.ttf",
                 "fontSubtitle": "剑豪体.ttf",
-                "titleSize": 160,
-                "subtitleSize": 80,
-                "titleColor": "#FFFFFF",
-                "subtitleColor": "#AAAAAA",
-                "titleOffsetY": 0,
-                "subtitleOffsetY": 0,
-                "posterCount": 9,
-                "brightness": 0.7,
-                "blurRadius": 4,
-                "badgeStyle": "box",
+                                                                                                                                                                "badgeStyle": "box",
                 "badgeFont": "剑豪体.ttf",
                 "badgeSize": 90,
-                "badgeXPercent": 2,
-                "badgeYPercent": 3,
-                "badgeTextColor": "#FFFFFF",
-                "badgeBgColor": "#0F172A",
-                "badgeOpacity": 0,
-                "badgeBorderOpacity": 30,
-                "fanRadius": 1200,
-                "fanSpread": 40,
-                "centerScale": 0.55,
-                "sideScaleShrink": 0.95,
-                "layoutYOffset": 100,
-            },
+                                                                                                                                                                                            },
         )
