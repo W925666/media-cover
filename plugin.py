@@ -115,6 +115,23 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @query("libraries")
     def libraries(self, input: dict, ctx: Context):
+        """实时经 SDK 读媒体库（参考 cover-studio 的 status 查询做法）；
+        失败时退回 load-libraries 写入的 storage 缓存。"""
+        server_id = (input or {}).get("serverId") or self._first_server_id(ctx)
+        if server_id:
+            try:
+                result = ctx.mt.emby.request(
+                    server_id=server_id, path="/Library/SelectableMediaFolders") or {}
+                if result.get("status") == 200:
+                    opts = _to_options(result.get("data") or [], "Name", "Id")
+                    if opts:
+                        try:
+                            ctx.mt.storage.set(key="libraries", value=opts)
+                        except Exception:
+                            pass
+                        return opts
+            except Exception as e:
+                ctx.mt.log(level="warn", message=f"实时读取媒体库失败，改用缓存: {e}")
         return _storage_value(ctx.mt.storage.get(key="libraries")) or []
 
     # ------------------------------------------------------------------ #
@@ -278,24 +295,27 @@ class Plugin(BasePlugin):
 
         if not server_id:
             raise ValueError("请先在设置中授权 Emby 服务器")
+        # 一键模式：不选条目时直接给媒体库生成封面（target = libraryId）
+        library_id_early = input.get("libraryId")
         if not target_id:
-            raise ValueError("请先选择目标条目")
+            target_id = library_id_early
+        if not target_id:
+            raise ValueError("请先选择媒体库")
 
-        # 1. 标题自动取条目名
+        # 1. 标题自动取条目名/库名
         title = ""
         subtitle = ""
-        if target_id:
-            item = ctx.mt.emby.request(
-                server_id=server_id,
-                path="/Items",
-                query={"Ids": target_id, "Fields": "ProductionYear"},
-            ) or {}
-            if item.get("status") == 200 and isinstance(item.get("data"), dict):
-                rows = item["data"].get("Items", [])
-                if rows:
-                    title = rows[0].get("Name") or ""
-                    year = rows[0].get("ProductionYear")
-                    subtitle = str(year) if year else ""
+        item = ctx.mt.emby.request(
+            server_id=server_id,
+            path="/Items",
+            query={"Ids": target_id, "Fields": "ProductionYear"},
+        ) or {}
+        if item.get("status") == 200 and isinstance(item.get("data"), dict):
+            rows = item["data"].get("Items", [])
+            if rows:
+                title = rows[0].get("Name") or ""
+                year = rows[0].get("ProductionYear")
+                subtitle = str(year) if year else ""
         if not title:
             title = input.get("title") or "封面"
 
@@ -398,30 +418,17 @@ class Plugin(BasePlugin):
 
     # ------------------------------------------------------------------ #
     def get_page(self, ctx: Context):
+        """一键生成页（对齐 cover-studio）：配置一次，之后只点一个按钮。
+
+        - Emby 地址/API Key 在插件「配置并启用」时填一次（plugin.json config）
+        - 媒体库列表由 libraries 查询实时经 SDK 读取，无需手动加载
+        - 点「一键生成」即自动取海报、合成、上传，无需选条目/选文件/调字号
+        """
         return ui.page(
             ui.Card(
-                ui.Text(text="选择 Emby 服务器、媒体库与条目，标题会自动取条目名。"),
-                ui.Select(label="Emby 服务器", bind="state.serverId",
-                          options=ui.ref("query.servers.data")),
-                ui.Button(label="加载媒体库", onClick=[{
-                    "type": "invoke", "actionId": "load-libraries",
-                    "input": {"serverId": ui.ref("state.serverId")},
-                }]),
+                ui.Text(text="配置好 Emby 地址和 API Key 后，选好媒体库点一键生成即可。"),
                 ui.Select(label="媒体库", bind="state.libraryId",
                           options=ui.ref("query.libraries.data")),
-                ui.Button(label="加载条目", onClick=[{
-                    "type": "invoke", "actionId": "load-items",
-                    "input": {
-                        "serverId": ui.ref("state.serverId"),
-                        "libraryId": ui.ref("state.libraryId"),
-                    },
-                }]),
-                ui.Select(label="目标条目", bind="state.targetId",
-                          options=ui.ref("query.items.data")),
-            ),
-            ui.Card(
-                ui.Text(text="素材与样式：用文件选择器直接选素材图片（可多选）。"),
-                ui.FilePicker(),
                 ui.Select(label="布局模板", bind="state.layout", options=[
                     {"label": "经典九宫格", "value": "经典九宫格"},
                     {"label": "经典堆叠", "value": "经典堆叠"},
@@ -433,17 +440,12 @@ class Plugin(BasePlugin):
                     {"label": "自由设计", "value": "自由设计"},
                     {"label": "旋转", "value": "旋转"},
                 ]),
-                ui.Input(label="标题字号", bind="state.titleSize", type="number"),
-                ui.Input(label="副标题字号", bind="state.subtitleSize", type="number"),
-                ui.Button(label="生成并上传封面", onClick=[{
+                ui.Button(label="🚀 一键生成封面", onClick=[{
                     "type": "invoke", "actionId": "generate-cover",
                     "input": {
                         "serverId": ui.ref("state.serverId"),
-                        "targetId": ui.ref("state.targetId"),
                         "libraryId": ui.ref("state.libraryId"),
                         "layout": ui.ref("state.layout"),
-                        "titleSize": ui.ref("state.titleSize"),
-                        "subtitleSize": ui.ref("state.subtitleSize"),
                         "upload": True,
                     },
                 }]),
@@ -453,15 +455,11 @@ class Plugin(BasePlugin):
             queries=[
                 {"id": "servers", "name": "servers"},
                 {"id": "libraries", "name": "libraries"},
-                {"id": "items", "name": "items"},
                 {"id": "preview", "name": "preview"},
             ],
             state={
                 "serverId": None,
                 "libraryId": None,
-                "targetId": None,
                 "layout": "经典九宫格",
-                "titleSize": 160,
-                "subtitleSize": 80,
             },
         )

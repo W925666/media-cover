@@ -29,8 +29,12 @@
     "type": "object",
     "additionalProperties": true,
     "properties": {
-      "embyUrl": {"type": "string"},
-      "embyApiKey": {"type": "string"}
+      "embyUrl": {
+        "type": "string"
+      },
+      "embyApiKey": {
+        "type": "string"
+      }
     }
   },
   "actions": [
@@ -113,9 +117,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "targetId"
-        ]
+        "required": []
       },
       "outputSchema": {}
     },
