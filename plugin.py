@@ -91,6 +91,21 @@ class EmbyDirect:
         except Exception:
             return None
 
+    def upload_image(self, item_id: str, img: bytes) -> bool:
+        """写回 Emby Primary 图：body 必须是 base64 字符串（不是二进制，
+        Emby 文档写的 binary 是错的）。走直连绕开宿主 256 KiB JSON 体限制。"""
+        try:
+            url = f"{self.base}/Items/{item_id}/Images/Primary"
+            payload = base64.b64encode(img)
+            req = urllib.request.Request(
+                url, data=payload, method="POST",
+                headers={"X-Emby-Token": self.key, "Content-Type": "image/jpeg"},
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return 200 <= resp.status < 300
+        except Exception:
+            return False
+
 
 class Plugin(BasePlugin):
     """封面工厂插件实例。"""
@@ -443,20 +458,29 @@ class Plugin(BasePlugin):
         result: dict[str, Any] = {"title": title, "size": len(image_bytes)}
 
         # 3. 上传到 Emby 条目封面（尽力而为）
+        #    SDK 的 emby.request JSON 体上限 256 KiB，封面 b64 通常超限，
+        #    所以优先走 EmbyDirect 直连（参考 cover-studio）；没配 Key 才走 SDK。
         if upload:
             ctx.mt.log(level="info", message=f"上传封面到 Emby 条目 {target_id}")
-            resp = ctx.mt.emby.request(
-                server_id=server_id,
-                method="POST",
-                path=f"/Items/{target_id}/Images/Primary",
-                json=b64,
-            ) or {}
-            result["uploadStatus"] = resp.get("status")
-            result["uploaded"] = resp.get("status") in (200, 204)
-            if result["uploaded"]:
-                ctx.mt.log(level="info", message="封面已上传到 Emby")
+            if direct.ok:
+                ok = direct.upload_image(str(target_id), image_bytes)
+                result["uploaded"] = ok
+                result["uploadStatus"] = 204 if ok else 0
+                ctx.mt.log(level="info" if ok else "warn",
+                           message="封面已上传到 Emby（直连）" if ok else "直连上传失败")
             else:
-                ctx.mt.log(level="warn", message=f"上传返回 HTTP {resp.get('status')}")
+                resp = ctx.mt.emby.request(
+                    server_id=server_id,
+                    method="POST",
+                    path=f"/Items/{target_id}/Images/Primary",
+                    json=b64,
+                ) or {}
+                result["uploadStatus"] = resp.get("status")
+                result["uploaded"] = resp.get("status") in (200, 204)
+                if result["uploaded"]:
+                    ctx.mt.log(level="info", message="封面已上传到 Emby")
+                else:
+                    ctx.mt.log(level="warn", message=f"上传返回 HTTP {resp.get('status')}")
 
         # 4. 保存预览（宿主 storage 单值上限 256 KiB，完整封面 b64 常超限，
         #    存一张缩小预览图；失败就跳过，不影响生成结果）
