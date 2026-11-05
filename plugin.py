@@ -447,9 +447,22 @@ class Plugin(BasePlugin):
             else:
                 ctx.mt.log(level="warn", message=f"上传返回 HTTP {resp.get('status')}")
 
-        # 4. 保存预览
-        if len(image_bytes) <= 8 * 1024 * 1024:
-            ctx.mt.storage.set(key="preview", value={"b64": b64, "size": len(image_bytes)})
+        # 4. 保存预览（宿主 storage 单值上限 256 KiB，完整封面 b64 常超限，
+        #    存一张缩小预览图；失败就跳过，不影响生成结果）
+        try:
+            from io import BytesIO as _BytesIO
+            from PIL import Image as _Image
+            _img = _Image.open(_BytesIO(image_bytes))
+            _img.thumbnail((480, 480))
+            _buf = _BytesIO()
+            _img.convert("RGB").save(_buf, format="JPEG", quality=60)
+            _thumb_b64 = base64.b64encode(_buf.getvalue()).decode("utf-8")
+            if len(_thumb_b64) <= 200 * 1024:
+                ctx.mt.storage.set(key="preview", value={"b64": _thumb_b64, "size": len(_buf.getvalue())})
+            else:
+                ctx.mt.log(level="warn", message="预览图仍超 storage 上限，已跳过保存")
+        except Exception as e:
+            ctx.mt.log(level="warn", message=f"预览保存跳过: {e}")
 
         return result
 
@@ -505,83 +518,18 @@ class Plugin(BasePlugin):
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
                         "fontSubtitle": ui.ref("state.fontSubtitle"),
-                        "titleSize": ui.ref("state.titleSize"),
-                        "subtitleSize": ui.ref("state.subtitleSize"),
-                        "titleColor": ui.ref("state.titleColor"),
-                        "subtitleColor": ui.ref("state.subtitleColor"),
-                        "titleOffsetY": ui.ref("state.titleOffsetY"),
-                        "subtitleOffsetY": ui.ref("state.subtitleOffsetY"),
-                        "posterCount": ui.ref("state.posterCount"),
-                        "brightness": ui.ref("state.brightness"),
-                        "blurRadius": ui.ref("state.blurRadius"),
-                        "badgeStyle": ui.ref("state.badgeStyle"),
-                        "badgeFont": ui.ref("state.badgeFont"),
                         "badgeSize": ui.ref("state.badgeSize"),
-                        "badgeXPercent": ui.ref("state.badgeXPercent"),
-                        "badgeYPercent": ui.ref("state.badgeYPercent"),
-                        "badgeTextColor": ui.ref("state.badgeTextColor"),
-                        "badgeBgColor": ui.ref("state.badgeBgColor"),
-                        "badgeOpacity": ui.ref("state.badgeOpacity"),
-                        "badgeBorderOpacity": ui.ref("state.badgeBorderOpacity"),
-                        "fanRadius": ui.ref("state.fanRadius"),
-                        "fanSpread": ui.ref("state.fanSpread"),
-                        "centerScale": ui.ref("state.centerScale"),
-                        "sideScaleShrink": ui.ref("state.sideScaleShrink"),
-                        "layoutYOffset": ui.ref("state.layoutYOffset"),
                         "upload": True,
                     },
                 }]),
             ),
             ui.Card(
-                ui.Text(text="字体与排版：字体从内置字体库选，找不到时引擎自动用同目录其他字体兜底。"),
+                ui.Text(text="字体：从内置字体库选，找不到时引擎自动用同目录其他字体兜底。"),
                 ui.Select(label="主标题字体", bind="state.fontTitle",
                           options=ui.ref("query.fonts.data")),
                 ui.Select(label="副标题字体", bind="state.fontSubtitle",
                           options=ui.ref("query.fonts.data")),
-                ui.Input(label="主标题字号", bind="state.titleSize", type="number"),
-                ui.Input(label="副标题字号", bind="state.subtitleSize", type="number"),
-                ui.Input(label="主标题颜色", bind="state.titleColor"),
-                ui.Input(label="副标题颜色", bind="state.subtitleColor"),
-                ui.Input(label="主标题垂直偏移", bind="state.titleOffsetY", type="number"),
-                ui.Input(label="副标题垂直偏移", bind="state.subtitleOffsetY", type="number"),
-            ),
-            ui.Card(
-                ui.Text(text="徽章（左上角数量角标）：样式 none=不显示，box/ribbon/circle 等见引擎。"),
-                ui.Select(label="徽章样式", bind="state.badgeStyle", options=[
-                    {"label": "不显示", "value": "none"},
-                    {"label": "圆角框", "value": "box"},
-                    {"label": "斜带", "value": "ribbon"},
-                    {"label": "圆环", "value": "circle"},
-                    {"label": "描边", "value": "outline"},
-                    {"label": "六边形", "value": "hexagon"},
-                    {"label": "票根", "value": "ticket"},
-                    {"label": "邮戳", "value": "stamp"},
-                    {"label": "故障风", "value": "glitch"},
-                    {"label": "波形", "value": "wave"},
-                    {"label": "爆发", "value": "burst"},
-                    {"label": "胶带", "value": "tape"},
-                    {"label": "分段", "value": "split"},
-                ]),
-                ui.Select(label="徽章字体", bind="state.badgeFont",
-                          options=ui.ref("query.fonts.data")),
                 ui.Input(label="徽章大小", bind="state.badgeSize", type="number"),
-                ui.Input(label="水平位置 %", bind="state.badgeXPercent", type="number"),
-                ui.Input(label="垂直位置 %", bind="state.badgeYPercent", type="number"),
-                ui.Input(label="文字配色", bind="state.badgeTextColor"),
-                ui.Input(label="图形配色", bind="state.badgeBgColor"),
-                ui.Input(label="背景透明度", bind="state.badgeOpacity", type="number"),
-                ui.Input(label="边框透明度", bind="state.badgeBorderOpacity", type="number"),
-            ),
-            ui.Card(
-                ui.Text(text="资源与扇形布局参数（其他布局自动忽略不认识的参数）。"),
-                ui.Input(label="海报数量", bind="state.posterCount", type="number"),
-                ui.Input(label="背景压暗程度 (0-1，如 0.7)", bind="state.brightness", type="number"),
-                ui.Input(label="背景模糊程度", bind="state.blurRadius", type="number"),
-                ui.Input(label="扇形半径 (曲率)", bind="state.fanRadius", type="number"),
-                ui.Input(label="扇形展开总角度", bind="state.fanSpread", type="number"),
-                ui.Input(label="C位海报大小", bind="state.centerScale", type="number"),
-                ui.Input(label="侧边缩小比例", bind="state.sideScaleShrink", type="number"),
-                ui.Input(label="海报整体垂直位置", bind="state.layoutYOffset", type="number"),
             ),
             ui.RunHistory(),
             ui.RunLog(),
@@ -597,28 +545,6 @@ class Plugin(BasePlugin):
                 "layout": "经典九宫格",
                 "fontTitle": "OPPOSans-B.ttf",
                 "fontSubtitle": "OPPOSans-B.ttf",
-                "titleSize": 160,
-                "subtitleSize": 80,
-                "titleColor": "#FFFFFF",
-                "subtitleColor": "#AAAAAA",
-                "titleOffsetY": 0,
-                "subtitleOffsetY": 0,
-                "posterCount": 9,
-                "brightness": 0.7,
-                "blurRadius": 4,
-                "badgeStyle": "none",
-                "badgeFont": "OPPOSans-B.ttf",
                 "badgeSize": 90,
-                "badgeXPercent": 2,
-                "badgeYPercent": 3,
-                "badgeTextColor": "#FFFFFF",
-                "badgeBgColor": "#000000",
-                "badgeOpacity": 255,
-                "badgeBorderOpacity": 40,
-                "fanRadius": 1200,
-                "fanSpread": 40,
-                "centerScale": 0.55,
-                "sideScaleShrink": 0.95,
-                "layoutYOffset": 100,
             },
         )
