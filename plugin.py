@@ -380,7 +380,8 @@ class Plugin(BasePlugin):
         cfg = self._plugin_config(ctx)
         direct = EmbyDirect(input.get("embyUrl") or cfg.get("embyUrl") or "",
                             input.get("embyApiKey") or cfg.get("embyApiKey") or "")
-        library_id = str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None
+        # 自动选库时 input 里没有 libraryId，用自动选中的库取图
+        library_id = library_id_early or (str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None)
         poster_paths: list[str] = []
         library_total = 0
         if direct.ok and library_id:
