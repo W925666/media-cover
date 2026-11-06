@@ -456,8 +456,8 @@ class Plugin(BasePlugin):
             "transition_spin": 38,
         })
         # 旋转布局：原版 angle_top=0（主卡不转、只有背后模糊卡歪着，看起来没转），
-        # 这里把角度调大，主卡肉眼可见地斜着
-        if layout == "旋转" and not input.get("templateName"):
+        # 这里把角度调大，主卡肉眼可见地斜着（模板预设带 angle_top=0 也要覆盖）
+        if layout == "旋转":
             config["angle_top"] = 15
             config["angle_mid"] = 28
             config["angle_bot"] = 42
@@ -767,7 +767,7 @@ class Plugin(BasePlugin):
             state={
                 "serverId": None,
                 "libraryId": None,
-                "templateName": None,
+                "templateName": "preset_1769653171951.json",
                                                                 "layout": "经典九宫格",
                 "fontTitle": "剑豪体.ttf",
                 "fontSubtitle": "剑豪体.ttf",
