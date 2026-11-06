@@ -745,7 +745,7 @@ class PosterEngine:
         output = BytesIO()
 
         if is_dynamic:
-            print(f">>> [Engine] 启动多线程动态 GIF 渲染 (Max 300 Frames)...")
+            print(f">>> [Engine] 启动动态 GIF 渲染 (Max 80 Frames)...")
 
             # Warm the shared cache before frame workers start so the same Emby
             # poster/backdrop is not downloaded concurrently for every frame.
@@ -781,7 +781,7 @@ class PosterEngine:
                 item_count = min(item_count, max(1, int(config.get('poster_count', item_count))))
                 switch_interval = max(500, int(config.get('switch_interval', 2500)))
                 frames_per_item = max(3, round(switch_interval / duration))
-                total_frames = min(item_count * frames_per_item, 300)
+                total_frames = min(item_count * frames_per_item, 80)
             else:
                 user_frames = int(config.get('anim_frames', 30))
                 total_frames = min(user_frames, 300)
@@ -810,7 +810,7 @@ class PosterEngine:
                 return idx, resized
 
             # 动态渲染改为双线程：降低内存峰值，避免 OOM（8 线程会 OOM，1 线程太慢）
-            worker_count = 2
+            worker_count = 1
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
                 futures = [executor.submit(render_one_frame, i) for i in range(total_frames)]
                 for future in as_completed(futures):
