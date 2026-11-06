@@ -809,8 +809,8 @@ class PosterEngine:
                 resized = final_frame.resize((target_w, target_h), Image.LANCZOS)
                 return idx, resized
 
-            # 动态渲染 4 线程：速度与内存的折中（8 线程会 OOM，1 线程太慢）
-            worker_count = 4
+            # 动态渲染改为双线程：降低内存峰值，避免 OOM（8 线程会 OOM，1 线程太慢）
+            worker_count = 2
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
                 futures = [executor.submit(render_one_frame, i) for i in range(total_frames)]
                 for future in as_completed(futures):
