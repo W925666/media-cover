@@ -267,13 +267,15 @@ class Plugin(BasePlugin):
         query = {
             "ParentId": library_id, "Recursive": True,
             "IncludeItemTypes": "Movie,Series,BoxSet",
-            "Fields": "ProductionYear,ImageTags,BackdropImageTags,DateCreated",
+            "Fields": "ProductionYear,ImageTags,BackdropImageTags,PremiereDate,DateCreated",
             "Limit": 300,
             "EnableTotalRecordCount": True,
         }
         # 最新入库交给 Emby 排序；随机模式拉取更大的候选池后在插件端洗牌。
         if source_mode == "latest":
             query.update({"SortBy": "DateCreated", "SortOrder": "Descending"})
+        elif source_mode == "premiere":
+            query.update({"SortBy": "PremiereDate", "SortOrder": "Descending"})
         result = ctx.mt.emby.request(
             server_id=server_id, path="/Items", query=query,
         ) or {}
@@ -802,8 +804,9 @@ class Plugin(BasePlugin):
                 ui.Select(label="取图模式", bind="state.sourceMode", options=[
                     {"label": "随机取图", "value": "random"},
                     {"label": "最新入库", "value": "latest"},
+                    {"label": "最新发行", "value": "premiere"},
                 ]),
-                ui.Text(text="随机取图：每次从最多 300 个候选作品中重新洗牌；最新入库：按 DateCreated 倒序取图。背景优先使用独立 Backdrop。"),
+                ui.Text(text="随机取图：从最多 300 个候选中重新洗牌；最新入库：按 DateCreated 倒序；最新发行：按 PremiereDate 倒序。"),
                 ui.Select(label="封面布局", bind="state.layout", options=[
                     {"label": "经典九宫格", "value": "经典九宫格"},
                     {"label": "经典堆叠", "value": "经典堆叠"},
