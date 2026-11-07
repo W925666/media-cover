@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import base64
 import os
+import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -103,23 +105,37 @@ class EmbyDirect:
             return "image/webp"
         return None
 
-    def upload_image(self, item_id: str, img: bytes) -> bool:
-        """写回 Emby Primary 图：body 必须是 base64 字符串（不是二进制，
-        Emby 文档写的 binary 是错的）。走直连绕开宿主 256 KiB JSON 体限制。"""
+    def upload_image(self, item_id: str, img: bytes) -> tuple[bool, int, str]:
+        """写回 Emby Primary 图并保留具体失败原因。
+
+        Emby 的该接口接收 base64 文本，但 Content-Type 要保持原始图片 MIME。
+        动态 GIF 可达数 MB，上传超时单独放宽，避免生成成功却在网络阶段误报。
+        """
         mime = self._image_mime(img)
         if not mime:
-            return False
+            return False, 0, "无法识别生成图片格式"
+        url = f"{self.base}/Items/{urllib.parse.quote(str(item_id), safe='')}/Images/Primary"
+        payload = base64.b64encode(img)
+        req = urllib.request.Request(
+            url, data=payload, method="POST",
+            headers={
+                "X-Emby-Token": self.key,
+                "Content-Type": mime,
+                "Content-Length": str(len(payload)),
+            },
+        )
         try:
-            url = f"{self.base}/Items/{item_id}/Images/Primary"
-            payload = base64.b64encode(img)
-            req = urllib.request.Request(
-                url, data=payload, method="POST",
-                headers={"X-Emby-Token": self.key, "Content-Type": mime},
-            )
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                return 200 <= resp.status < 300
-        except Exception:
-            return False
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                status = int(getattr(resp, "status", 0) or 0)
+                return 200 <= status < 300, status, ""
+        except urllib.error.HTTPError as exc:
+            try:
+                detail = exc.read(1024).decode("utf-8", errors="replace").strip()
+            except Exception:
+                detail = ""
+            return False, int(exc.code or 0), detail or str(exc.reason or exc)
+        except Exception as exc:
+            return False, 0, f"{type(exc).__name__}: {exc}"
 
 
 class Plugin(BasePlugin):
@@ -510,11 +526,16 @@ class Plugin(BasePlugin):
         if upload:
             ctx.mt.log(level="info", message=f"上传封面到 Emby 条目 {target_id}")
             if direct.ok:
-                ok = direct.upload_image(str(target_id), image_bytes)
+                ok, status, detail = direct.upload_image(str(target_id), image_bytes)
                 result["uploaded"] = ok
-                result["uploadStatus"] = 204 if ok else 0
-                ctx.mt.log(level="info" if ok else "warn",
-                           message="封面已上传到 Emby（直连）" if ok else "直连上传失败")
+                result["uploadStatus"] = status
+                if ok:
+                    ctx.mt.log(level="info", message=f"封面已上传到 Emby（直连，HTTP {status}）")
+                else:
+                    ctx.mt.log(
+                        level="warn",
+                        message=f"直连上传失败：HTTP {status or '无响应'}；{detail or '未知错误'}",
+                    )
             else:
                 resp = ctx.mt.emby.request(
                     server_id=server_id,
