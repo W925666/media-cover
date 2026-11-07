@@ -1,5 +1,4 @@
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance, ImageOps, ImageFont, ImageColor
-import numpy as np
 import math
 import os
 import traceback
@@ -24,17 +23,35 @@ def get_real_asset(assets, filename):
 # 2. 核心算法 (透视与遮罩)
 # =============================================================================
 
+def _solve_linear_system(matrix, values):
+    """纯 Python 高斯消元，避免插件运行环境依赖 NumPy。"""
+    rows = [list(map(float, row)) + [float(value)] for row, value in zip(matrix, values)]
+    size = len(values)
+    for col in range(size):
+        pivot = max(range(col, size), key=lambda row: abs(rows[row][col]))
+        if abs(rows[pivot][col]) < 1e-10:
+            return None
+        rows[col], rows[pivot] = rows[pivot], rows[col]
+        divisor = rows[col][col]
+        rows[col] = [value / divisor for value in rows[col]]
+        for row in range(size):
+            if row == col:
+                continue
+            factor = rows[row][col]
+            if factor:
+                rows[row] = [left - factor * right for left, right in zip(rows[row], rows[col])]
+    return [rows[row][-1] for row in range(size)]
+
+
 def find_coeffs(pa, pb):
     matrix = []
+    values = []
     for p1, p2 in zip(pa, pb):
         matrix.append([p1[0], p1[1], 1, 0, 0, 0, -p2[0]*p1[0], -p2[0]*p1[1]])
+        values.append(p2[0])
         matrix.append([0, 0, 0, p1[0], p1[1], 1, -p2[1]*p1[0], -p2[1]*p1[1]])
-    A = np.array(matrix, dtype=np.float32)
-    B = np.array(pb, dtype=np.float32).reshape(8)
-    try:
-        res = np.linalg.solve(A, B)
-        return res.reshape(8)
-    except: return None
+        values.append(p2[1])
+    return _solve_linear_system(matrix, values)
 
 def warp_image_to_quad(img, quad):
     w, h = img.size
@@ -63,20 +80,20 @@ def create_radial_mask(size, radius_scale=1.0, intensity=1.0):
     max_dist = math.sqrt(cx**2 + cy**2) * radius_scale
     
     try:
-        y, x = np.ogrid[:h, :w]
-        dist = np.sqrt((x - cx)**2 + (y - cy)**2)
-        norm_dist = dist / max_dist
-        norm_dist = np.clip(norm_dist, 0, 1)
-        norm_dist = norm_dist * norm_dist * (3 - 2 * norm_dist)
-        
-        alpha = (norm_dist * 255 * intensity).astype(np.uint8)
-        mask = Image.fromarray(alpha, mode='L')
-        
+        mask = Image.new('L', size)
+        pixels = mask.load()
+        strength = max(0.0, min(float(intensity), 1.0))
+        for y in range(h):
+            dy2 = (y - cy) ** 2
+            for x in range(w):
+                norm_dist = min(1.0, math.sqrt((x - cx) ** 2 + dy2) / max_dist)
+                smooth = norm_dist * norm_dist * (3 - 2 * norm_dist)
+                pixels[x, y] = round(smooth * 255 * strength)
         vignette = Image.new('RGBA', size, (0, 0, 0, 0))
         black = Image.new('RGBA', size, (0, 0, 0, 255))
         vignette.paste(black, (0, 0), mask=mask)
         return vignette
-    except:
+    except Exception:
         return Image.new('RGBA', size, (0,0,0, int(100*intensity)))
 
 # =============================================================================
