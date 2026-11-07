@@ -132,6 +132,9 @@ def render(ctx, bg, config, assets, fonts):
         bg = bg.filter(ImageFilter.GaussianBlur(blur_r))
         overlay = Image.new('RGBA', bg.size, (0, 0, 0, darkness))
         bg = Image.alpha_composite(bg.convert('RGBA'), overlay)
+        overlay.close()
+        hero_img_raw.close()
+        del overlay, hero_img_raw
     else:
         bg = Image.new('RGBA', (canvas_w, canvas_h), (30,30,30,255))
         
@@ -201,6 +204,11 @@ def render(ctx, bg, config, assets, fonts):
         paste_y = int(item['y'] - rh / 2 + offset_y_fix) 
 
         bg.paste(rotated_group, (paste_x, paste_y), mask=rotated_group)
+        # 显式释放本张海报的倒影/阴影/旋转缓冲，下一张不叠加旧缓冲。
+        rotated_group.close()
+        group.close()
+        img.close()
+        del rotated_group, group, img
 
     # 5. 绘制文字 (使用新版标准逻辑)
     draw = ImageDraw.Draw(bg)

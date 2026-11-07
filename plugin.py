@@ -836,6 +836,7 @@ class Plugin(BasePlugin):
                 ctx.mt.log(level="warn", message=f"媒体库 {entry['library']} 生成失败: {e}")
             results.append(entry)
             # 每生成完一个库就回收内存，避免 28 个库在同一 worker 里撑爆内存预算
+            self.engine().clear_image_cache()
             import gc as _gc
             _gc.collect()
         ok = sum(1 for r in results if r["status"] == "uploaded")

@@ -36,11 +36,20 @@ class PosterEngine:
         self.default_font_path = os.path.join(fonts_dir, "OPPOSans-B.ttf")
         self._load_layouts()
         self._img_cache = {}
-        self._img_cache_max_pixels = 24_000_000
+        # RGBA 每像素 4 字节；将常驻缓存从约 96 MB 收紧为约 16 MB。
+        self._img_cache_max_pixels = 4_000_000
         self._img_cache_pixels = 0
         self._max_source_side = 1920
         self._max_source_pixels = 40_000_000
         self._lock = threading.Lock()
+
+    def clear_image_cache(self):
+        """在媒体库之间释放 Pillow 原生图像缓冲，而非只等待 Python GC。"""
+        with self._lock:
+            for image in self._img_cache.values():
+                image.close()
+            self._img_cache.clear()
+            self._img_cache_pixels = 0
 
     def _load_layouts(self):
         # 如果已经加载过，直接复用缓存
@@ -94,6 +103,7 @@ class PosterEngine:
                 if img.width * img.height > self._max_source_pixels:
                     logger.warning("跳过超大图片 %s: %sx%s", str(url)[:120], img.width, img.height)
                     return None
+                img.draft('RGB', (self._max_source_side, self._max_source_side))
                 img.thumbnail((self._max_source_side, self._max_source_side), Image.LANCZOS)
                 img = img.convert("RGBA")
             elif url.startswith(("http://", "https://")):
@@ -110,6 +120,7 @@ class PosterEngine:
                     if img.width * img.height > self._max_source_pixels:
                         logger.warning("跳过超大图片 %s: %sx%s", str(url)[:120], img.width, img.height)
                         return None
+                    img.draft('RGB', (self._max_source_side, self._max_source_side))
                     img.thumbnail((self._max_source_side, self._max_source_side), Image.LANCZOS)
                     img = img.convert("RGBA")
             elif os.path.isfile(url):
@@ -118,6 +129,7 @@ class PosterEngine:
                 if img.width * img.height > self._max_source_pixels:
                     logger.warning("跳过超大图片 %s: %sx%s", str(url)[:120], img.width, img.height)
                     return None
+                img.draft('RGB', (self._max_source_side, self._max_source_side))
                 img.thumbnail((self._max_source_side, self._max_source_side), Image.LANCZOS)
                 img = img.convert("RGBA")
 
@@ -128,10 +140,12 @@ class PosterEngine:
                         previous = self._img_cache.pop(url, None)
                         if previous is not None:
                             self._img_cache_pixels -= previous.width * previous.height
+                            previous.close()
                         while self._img_cache and self._img_cache_pixels + pixels > self._img_cache_max_pixels:
                             oldest_url = next(iter(self._img_cache))
                             oldest = self._img_cache.pop(oldest_url)
                             self._img_cache_pixels -= oldest.width * oldest.height
+                            oldest.close()
                         self._img_cache[url] = img.copy()
                         self._img_cache_pixels += pixels
                 return img
