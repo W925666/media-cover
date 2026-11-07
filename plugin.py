@@ -803,7 +803,9 @@ class Plugin(BasePlugin):
                 ui.Button(label="🚀 一键生成封面", onClick=[{
                     "type": "invoke", "actionId": "generate-cover",
                     "input": {
-                        "serverId": ui.ref("state.serverId"),
+                        # 页面 Select 在只存在一个服务器时会显示首项，但 state.serverId
+                        # 仍可能是 null。动作内部本来就会自动选择首个已授权服务器，
+                        # 因此这里不提交空 serverId，避免前端 Schema 校验拦截。
                         "libraryId": ui.ref("state.libraryId"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
