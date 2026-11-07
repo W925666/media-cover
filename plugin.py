@@ -1050,8 +1050,8 @@ class Plugin(BasePlugin):
                 ui.Input(label="海报数量（奇数）", bind="state.posterCount", type="number"),
                 ui.Input(label="主标题内容（留空自动）", bind="state.title"),
                 ui.Input(label="副标题内容（留空自动）", bind="state.subtitle"),
-                ui.Input(label="主标题字号（留空使用布局默认）", bind="state.titleSize", type="number"),
-                ui.Input(label="副标题字号（留空使用布局默认）", bind="state.subtitleSize", type="number"),
+                ui.Input(label="主标题大小（留空使用布局默认）", bind="state.titleSize", type="number"),
+                ui.Input(label="副标题大小（留空使用布局默认）", bind="state.subtitleSize", type="number"),
                 ui.Select(label="主标题颜色模式", bind="state.titleColorMode", options=[
                     {"label": "固定颜色", "value": "solid"},
                     {"label": "动态随机颜色", "value": "random"},
