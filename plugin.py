@@ -605,7 +605,7 @@ class Plugin(BasePlugin):
                 config[snake] = value
         badge_mode = input.get("badgeColorMode") or "follow"
         config["badge_follow_text_color"] = badge_mode == "follow"
-        if badge_mode in ("solid", "random", "rainbow"):
+        if badge_mode in ("solid", "random", "rainbow", "rainbow_gradient"):
             config["badge_text_color_mode"] = badge_mode
         for key in _extra_num:
             value = input.get(key)
@@ -943,16 +943,18 @@ class Plugin(BasePlugin):
                 ui.Select(label="主标题颜色模式", bind="state.titleColorMode", options=[
                     {"label": "固定颜色", "value": "solid"},
                     {"label": "动态随机颜色", "value": "random"},
-                    {"label": "彩虹渐变", "value": "rainbow"},
+                    {"label": "彩虹闪烁", "value": "rainbow"},
+                    {"label": "彩虹渐变", "value": "rainbow_gradient"},
                 ]),
                 ui.Input(label="主标题固定颜色（HEX）", bind="state.titleColor"),
                 ui.Select(label="副标题颜色模式", bind="state.subtitleColorMode", options=[
                     {"label": "固定颜色", "value": "solid"},
                     {"label": "动态随机颜色", "value": "random"},
-                    {"label": "彩虹渐变", "value": "rainbow"},
+                    {"label": "彩虹闪烁", "value": "rainbow"},
+                    {"label": "彩虹渐变", "value": "rainbow_gradient"},
                 ]),
                 ui.Input(label="副标题固定颜色（HEX）", bind="state.subtitleColor"),
-                ui.Text(text="动态布局中，随机色和彩虹色会随 GIF 帧平滑变化；静态布局会生成随机亮色或彩虹渐变。"),
+                ui.Text(text="彩虹闪烁：整段文字按红橙黄绿青蓝紫逐色闪动；彩虹渐变：同一行文字内部同时显示多种颜色并流动。"),
                 ui.Button(label="💾 保存资源与标题设置", onClick=[{
                     "type": "invoke", "actionId": "save-settings",
                     "input": {
@@ -995,7 +997,8 @@ class Plugin(BasePlugin):
                     {"label": "跟随主标题颜色", "value": "follow"},
                     {"label": "固定颜色", "value": "solid"},
                     {"label": "动态随机颜色", "value": "random"},
-                    {"label": "彩虹渐变", "value": "rainbow"},
+                    {"label": "彩虹闪烁", "value": "rainbow"},
+                    {"label": "彩虹渐变", "value": "rainbow_gradient"},
                 ]),
                 ui.Input(label="徽章文字固定颜色（HEX）", bind="state.badgeTextColor"),
                 ui.Input(label="徽章大小", bind="state.badgeSize", type="number"),

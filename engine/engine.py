@@ -236,12 +236,23 @@ class PosterEngine:
         solid = config.get(f'{prefix}_color', fallback)
         mode = config.get(f'{prefix}_color_mode', 'solid')
         if mode == 'random':
-            # 静态图每次生成一种亮色；动态图由 frame_color_phase 驱动逐帧变化。
+            # 静态图每次生成一种亮色；动态图按时间片跳到新的随机亮色。
             phase = config.get('frame_color_phase')
-            hue = float(phase) % 1.0 if phase is not None else random.random()
+            if phase is None:
+                hue = random.random()
+            else:
+                color_step = int(float(phase) * 12)
+                hue = (color_step * 0.61803398875 + 0.137) % 1.0
             rgb = colorsys.hsv_to_rgb(hue, 0.78, 1.0)
             return tuple(round(v * 255) for v in rgb) + (max(0, min(255, int(opacity))),)
         if mode == 'rainbow':
+            # 整段文字使用同一种颜色，并按红橙黄绿青蓝紫循环，形成闪烁彩虹。
+            phase = float(config.get('frame_color_phase', 0.0)) % 1.0
+            rainbow_hues = (0.0, 0.075, 0.15, 0.33, 0.50, 0.62, 0.78, 0.90)
+            hue = rainbow_hues[int(phase * len(rainbow_hues)) % len(rainbow_hues)]
+            rgb = colorsys.hsv_to_rgb(hue, 0.90, 1.0)
+            return tuple(round(v * 255) for v in rgb) + (max(0, min(255, int(opacity))),)
+        if mode == 'rainbow_gradient':
             phase = float(config.get('frame_color_phase', 0.0)) % 1.0
             colors = []
             for offset in (0.0, 1 / 3, 2 / 3):
