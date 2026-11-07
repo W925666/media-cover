@@ -752,9 +752,37 @@ class Plugin(BasePlugin):
         if chosen_title_font:
             batch_input["fontTitle"] = chosen_title_font
             batch_input["forceUniformTitleFont"] = True
+        # 英文副标题和数字角标也做同样的签名字形检查。当前语义副标题为 ASCII，
+        # 但用户可换字体；提前锁定能避免未来某款字体缺少 &、数字或连字符。
+        subtitle_samples = [
+            "CHINESE DRAMA", "CHINESE ANIMATION", "KIDS & FAMILY",
+            "JAPAN & KOREA TV", "VARIETY SHOWS", "DOCUMENTARIES",
+            "SHORT DRAMAS", "CHINESE MOVIES", "INTERNATIONAL MOVIES",
+            "ANIMATED MOVIES", "UNCENSORED", "CENSORED",
+            "CHINESE SUBTITLES", "CHINESE CONTENT", "FC2 CONTENT",
+            "WESTERN CONTENT", "CREATOR VIDEOS", "JAPANESE ANIMATION",
+            "WESTERN ANIMATION", "TOKUSATSU MOVIES", "TOKUSATSU SERIES",
+            "R-RATED MOVIES", "JAPANESE & KOREAN MOVIES",
+            "WESTERN TV SERIES", "HONG KONG & TAIWAN DRAMA",
+            "DOCUMENTARY FILMS", "CONCERTS", "LTX MEDIA", "MEDIA LIBRARY",
+        ]
+        chosen_subtitle_font = self.engine().resolve_font_filename_for_texts(
+            batch_input.get("fontSubtitle") or batch_input.get("fontTitle") or "OPPOSans-B.ttf",
+            subtitle_samples, 64,
+        )
+        chosen_badge_font = self.engine().resolve_font_filename_for_texts(
+            batch_input.get("badgeFont") or batch_input.get("fontTitle") or "OPPOSans-B.ttf",
+            ["0123456789"], 64,
+        )
+        if chosen_subtitle_font:
+            batch_input["fontSubtitle"] = chosen_subtitle_font
+        if chosen_badge_font:
+            batch_input["badgeFont"] = chosen_badge_font
         ctx.mt.log(level="info", message=(
             f"批量参数已锁定：布局={batch_input.get('layout') or '默认'}，"
             f"标题字体={batch_input.get('fontTitle') or '默认'}，"
+            f"副标题字体={batch_input.get('fontSubtitle') or '默认'}，"
+            f"角标字体={batch_input.get('badgeFont') or '默认'}，"
             f"海报数量={max(1, int(batch_input.get('posterCount') or 9))}"
         ))
         results: list[dict] = []
