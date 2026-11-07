@@ -438,7 +438,7 @@ class Plugin(BasePlugin):
                 exact_subtitles = {
                     "国漫": "CHINESE ANIMATION",
                     "儿童": "KIDS & FAMILY",
-                    "日韩剧": "JAPANESE & KOREAN DRAMA",
+                    "日韩剧": "JAPANESE & KOREAN TV",
                     "综艺剧": "VARIETY SHOWS",
                     "纪录片": "DOCUMENTARIES",
                     "短剧": "SHORT DRAMAS",
@@ -471,7 +471,7 @@ class Plugin(BasePlugin):
                     (("动画电影",), "ANIMATED MOVIES"),
                     (("动漫", "动画", "anime"), "ANIMATION"),
                     (("国产剧", "国剧", "大陆剧"), "CHINESE DRAMA"),
-                    (("日韩剧",), "JAPANESE & KOREAN DRAMA"),
+                    (("日韩剧",), "JAPANESE & KOREAN TV"),
                     (("韩剧", "韩国剧"), "KOREAN DRAMA"),
                     (("日剧", "日本剧"), "JAPANESE DRAMA"),
                     (("美剧", "欧美剧", "英剧"), "WESTERN TV SERIES"),
@@ -608,7 +608,7 @@ class Plugin(BasePlugin):
             if input.get("titleSize") in (None, ""):
                 config["title_size"] = 190
             if input.get("subtitleSize") in (None, ""):
-                config["subtitle_size"] = 72
+                config["subtitle_size"] = 66
             config["title_pos_y"] = 34
             config["subtitle_pos_y"] = 58
             config["title_width_pct"] = 46
