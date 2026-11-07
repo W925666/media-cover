@@ -35,7 +35,10 @@ class PosterEngine:
         self.default_font_path = os.path.join(fonts_dir, "OPPOSans-B.ttf")
         self._load_layouts()
         self._img_cache = {}
-        self._img_cache_max = 50
+        self._img_cache_max_pixels = 24_000_000
+        self._img_cache_pixels = 0
+        self._max_source_side = 1920
+        self._max_source_pixels = 40_000_000
         self._lock = threading.Lock()
 
     def _load_layouts(self):
@@ -77,36 +80,58 @@ class PosterEngine:
     def download_img(self, url):
         if not url: return None
         with self._lock:
-            if url in self._img_cache:
-                return self._img_cache[url].copy()
+            cached = self._img_cache.get(url)
+            if cached is not None:
+                return cached.copy()
 
         try:
             img = None
             if url.startswith("data:image"):
                 base64_data = re.sub('^data:image/.+;base64,', '', url)
                 image_data = base64.b64decode(base64_data)
-                img = Image.open(BytesIO(image_data)).convert("RGBA")
+                img = Image.open(BytesIO(image_data))
+                if img.width * img.height > self._max_source_pixels:
+                    logger.warning("跳过超大图片 %s: %sx%s", str(url)[:120], img.width, img.height)
+                    return None
+                img.thumbnail((self._max_source_side, self._max_source_side), Image.LANCZOS)
+                img = img.convert("RGBA")
             elif url.startswith(("http://", "https://")):
                 # Emby 直连图片 URL（SDK emby.request 只返回 JSON/UTF-8，
                 # 拿不到二进制，所以图片走 urllib 直连，带 X-Emby-Token）
                 req = urllib.request.Request(url, headers={"Accept": "*/*"})
                 with urllib.request.urlopen(req, timeout=25) as resp:
-                    img = Image.open(BytesIO(resp.read())).convert("RGBA")
+                    img = Image.open(BytesIO(resp.read()))
+                    if img.width * img.height > self._max_source_pixels:
+                        logger.warning("跳过超大图片 %s: %sx%s", str(url)[:120], img.width, img.height)
+                        return None
+                    img.thumbnail((self._max_source_side, self._max_source_side), Image.LANCZOS)
+                    img = img.convert("RGBA")
             elif os.path.isfile(url):
                 # 本地文件路径（已由宿主 ctx.download 落到工作目录）
-                img = Image.open(url).convert("RGBA")
-            
+                img = Image.open(url)
+                if img.width * img.height > self._max_source_pixels:
+                    logger.warning("跳过超大图片 %s: %sx%s", str(url)[:120], img.width, img.height)
+                    return None
+                img.thumbnail((self._max_source_side, self._max_source_side), Image.LANCZOS)
+                img = img.convert("RGBA")
+
             if img:
-                with self._lock:
-                    if len(self._img_cache) >= self._img_cache_max:
-                        # 删除最早的一半缓存
-                        keys = list(self._img_cache.keys())
-                        for k in keys[:len(keys) // 2]:
-                            del self._img_cache[k]
-                    self._img_cache[url] = img.copy()
+                pixels = img.width * img.height
+                if pixels <= self._img_cache_max_pixels:
+                    with self._lock:
+                        previous = self._img_cache.pop(url, None)
+                        if previous is not None:
+                            self._img_cache_pixels -= previous.width * previous.height
+                        while self._img_cache and self._img_cache_pixels + pixels > self._img_cache_max_pixels:
+                            oldest_url = next(iter(self._img_cache))
+                            oldest = self._img_cache.pop(oldest_url)
+                            self._img_cache_pixels -= oldest.width * oldest.height
+                        self._img_cache[url] = img.copy()
+                        self._img_cache_pixels += pixels
                 return img
             return None
         except Exception as e:
+            logger.warning("图片读取失败 %s: %s", str(url)[:160], e)
             return None
 
     @staticmethod
@@ -747,14 +772,8 @@ class PosterEngine:
         if is_dynamic:
             print(f">>> [Engine] 启动动态 GIF 渲染 (Max 80 Frames)...")
 
-            # Warm the shared cache before frame workers start so the same Emby
-            # poster/backdrop is not downloaded concurrently for every frame.
-            asset_urls = [assets.get('bg_url')]
-            asset_urls.extend(assets.get('posters') or [])
-            asset_urls.extend(assets.get('poster_backdrops') or [])
-            asset_urls.extend(assets.get('backdrops') or [])
-            for asset_url in dict.fromkeys(url for url in asset_urls if url):
-                self.download_img(asset_url)
+            # Avoid preloading every library image: a large library can exhaust
+            # the worker before frame rendering starts. Images load on demand.
             
             target_w = 533
             target_h = round(target_w * 9 / 16)

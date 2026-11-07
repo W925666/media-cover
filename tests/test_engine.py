@@ -75,6 +75,18 @@ def test_unknown_layout_falls_back_not_solid():
         assert len(solid) > 50000, len(solid)
 
 
+def test_image_cache_is_pixel_bounded_and_sources_are_downscaled():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "large.png")
+        Image.new("RGB", (3000, 2000), (20, 40, 60)).save(path)
+        engine = PosterEngine(fonts_dir=FONTS, layouts_dir=LAYOUTS)
+        image = engine.download_img(path)
+        assert image is not None
+        assert max(image.size) == 1920
+        assert engine._img_cache_pixels <= engine._img_cache_max_pixels
+        assert path in engine._img_cache
+
+
 def test_default_dirs_work_from_any_cwd():
     """不传 fonts/layouts 时应自动定位项目根目录。"""
     cwd = os.getcwd()
@@ -92,5 +104,7 @@ if __name__ == "__main__":
     print("test_all_layouts_render OK")
     test_unknown_layout_falls_back_not_solid()
     print("test_unknown_layout_falls_back_not_solid OK")
+    test_image_cache_is_pixel_bounded_and_sources_are_downscaled()
+    print("test_image_cache_is_pixel_bounded_and_sources_are_downscaled OK")
     test_default_dirs_work_from_any_cwd()
     print("test_default_dirs_work_from_any_cwd OK")
