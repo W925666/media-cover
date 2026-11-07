@@ -799,6 +799,7 @@ class Plugin(BasePlugin):
                     {"label": "荣耀视界", "value": "荣耀视界"},
                     {"label": "聚焦C佬", "value": "聚焦C佬"},
                 ]),
+                ui.Text(text="点击后按钮会显示运行中，并自动切换到本次运行；静态封面通常数秒，动态封面约 15–40 秒。"),
                 ui.Button(label="🚀 一键生成封面", onClick=[{
                     "type": "invoke", "actionId": "generate-cover",
                     "input": {
