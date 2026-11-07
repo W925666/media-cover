@@ -1,7 +1,7 @@
 {
   "id": "cover.factory",
   "name": "封面工厂",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "sdkVersion": "2",
   "author": "MediaTidy",
   "description": "复用 FrameBase 的 Pillow 封面渲染核心，从本地授权目录素材图片生成 Emby 封面（九宫格/堆叠/海报墙等多种布局），并可通过 Emby API 上传到目标条目。",
@@ -69,12 +69,8 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "serverId": {
-            "type": "string"
-          },
-          "libraryId": {
-            "type": "string"
-          },
+          "serverId": {},
+          "libraryId": {},
           "title": {
             "type": "string"
           },

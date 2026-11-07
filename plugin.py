@@ -803,15 +803,12 @@ class Plugin(BasePlugin):
                 ui.Button(label="🚀 一键生成封面", onClick=[{
                     "type": "invoke", "actionId": "generate-cover",
                     "input": {
-                        # Select 初次打开时可能只显示首项而 state 仍是 null。提交时
-                        # 优先使用用户选择值，否则读取查询结果的首项，确保既不触发
-                        # Schema 空值错误，也不会忽略用户选中的媒体库。
-                        "serverId": {"$op": "coalesce", "args": [
-                            ui.ref("state.serverId"), ui.ref("query.servers.data.0.value")
-                        ]},
-                        "libraryId": {"$op": "coalesce", "args": [
-                            ui.ref("state.libraryId"), ui.ref("query.libraries.data.0.value")
-                        ]},
+                        # 下拉框初次打开时 state 可能是 null。允许 null 传到动作，
+                        # generate_cover 内部会自动选择首个已授权服务器/媒体库；用户
+                        # 手动选择后则原样使用选择值。避免引用 query 数组下标——MT UI
+                        # v2 的绑定路径语法不支持这种数组引用。
+                        "serverId": ui.ref("state.serverId"),
+                        "libraryId": ui.ref("state.libraryId"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
                         "fontSubtitle": ui.ref("state.fontSubtitle"),
