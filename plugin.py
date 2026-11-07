@@ -1097,7 +1097,7 @@ class Plugin(BasePlugin):
                     visible=ui.expr("not", ui.expr("gt", ui.expr("length", ui.ref("query.preview.data.b64")), 0)),
                 ),
                 ui.Button(label="🔄 刷新生成预览", onClick=[{
-                    "type": "host", "action": "refreshPage",
+                    "type": "host", "name": "refreshPage",
                 }]),
             ),
             ui.Card(
