@@ -99,9 +99,14 @@ class PosterEngine:
             elif url.startswith(("http://", "https://")):
                 # Emby 直连图片 URL（SDK emby.request 只返回 JSON/UTF-8，
                 # 拿不到二进制，所以图片走 urllib 直连，带 X-Emby-Token）
-                req = urllib.request.Request(url, headers={"Accept": "*/*"})
+                req = urllib.request.Request(url, headers={"Accept": "image/*"})
                 with urllib.request.urlopen(req, timeout=25) as resp:
-                    img = Image.open(BytesIO(resp.read()))
+                    payload = resp.read()
+                    content_type = str(resp.headers.get("Content-Type") or "").lower()
+                    if content_type and not content_type.startswith("image/"):
+                        logger.warning("图片接口返回非图片内容 %s: %s", str(url)[:120], content_type)
+                        return None
+                    img = Image.open(BytesIO(payload))
                     if img.width * img.height > self._max_source_pixels:
                         logger.warning("跳过超大图片 %s: %sx%s", str(url)[:120], img.width, img.height)
                         return None

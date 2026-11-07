@@ -307,7 +307,9 @@ class Plugin(BasePlugin):
             picked.append(direct.image_url(str(it["Id"])))
             if len(picked) >= count and len(backdrops) >= 3:
                 break
-        return picked, (total or len(items)), backdrops
+        # 少数条目没有背景图时，不能让 backdrops 条件导致海报数量超过用户设置。
+        # 背景不足由布局自行复用已有背景或主海报兜底。
+        return picked[:count], (total or len(items)), backdrops[:max(count, 3)]
 
     def _first_server_id(self, ctx: Context) -> str | None:
         """返回第一个已授权且启用的 Emby 服务器 ID，无则 None。"""
@@ -704,6 +706,11 @@ class Plugin(BasePlugin):
         if chosen_title_font:
             batch_input["fontTitle"] = chosen_title_font
             batch_input["forceUniformTitleFont"] = True
+        ctx.mt.log(level="info", message=(
+            f"批量参数已锁定：布局={batch_input.get('layout') or '默认'}，"
+            f"标题字体={batch_input.get('fontTitle') or '默认'}，"
+            f"海报数量={max(1, int(batch_input.get('posterCount') or 9))}"
+        ))
         results: list[dict] = []
         for lib in libs:
             entry: dict[str, Any] = {"libraryId": str(lib["Id"]), "library": lib.get("Name") or ""}
