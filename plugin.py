@@ -173,6 +173,37 @@ class Plugin(BasePlugin):
         servers = ctx.mt.emby.servers.list()
         return _to_options(servers, "name", "id")
 
+    @action("save-server")
+    def save_server(self, input: dict, ctx: Context):
+        """为一台已获宿主授权的服务器保存独立直连参数。"""
+        server_id = str(input.get("serverId") or "").strip()
+        servers = ctx.mt.emby.servers.list()
+        if server_id not in {str(s.get("id")) for s in servers}:
+            raise ValueError("请先在 MediaTidy 添加此 Emby 服务器，并在插件授权中勾选它")
+        url = str(input.get("serverUrl") or "").strip()
+        key = str(input.get("serverApiKey") or "").strip()
+        if not url or not key:
+            raise ValueError("请填写此服务器的 Emby 地址和 API Key")
+        direct = EmbyDirect(url, key)
+        parsed = urllib.parse.urlparse(direct.base)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("Emby 地址须为有效的 HTTP 或 HTTPS 地址")
+        ctx.mt.storage.set(key=f"server-connection:{server_id}",
+                           value={"url": direct.base, "apiKey": key})
+        ctx.mt.storage.set(key="active-server", value=server_id)
+        return {"saved": True, "serverId": server_id}
+
+    def _direct_for_server(self, input: dict, ctx: Context, server_id: str):
+        connection = _storage_value(ctx.mt.storage.get(key=f"server-connection:{server_id}")) or {}
+        if connection:
+            return EmbyDirect(connection.get("url", ""), connection.get("apiKey", ""))
+        # 历史单服务器配置只归属第一台，绝不用于第二台服务器。
+        if str(server_id) == str(self._first_server_id(ctx)):
+            cfg = self._plugin_config(ctx)
+            return EmbyDirect(input.get("embyUrl") or cfg.get("embyUrl") or "",
+                              input.get("embyApiKey") or cfg.get("embyApiKey") or "")
+        raise ValueError("请先点击“添加 / 保存服务器连接”，填写所选服务器的独立地址和 API Key")
+
     # ------------------------------------------------------------------ #
     # 查询：媒体库列表（读 storage 缓存）
     # ------------------------------------------------------------------ #
@@ -211,6 +242,7 @@ class Plugin(BasePlugin):
         data = result.get("data") or []
         opts = _to_options(data, "Name", "Id")
         ctx.mt.storage.set(key="libraries", value=opts)
+        ctx.mt.storage.set(key="active-server", value=server_id)
         ctx.mt.log(level="info", message=f"已加载 {len(opts)} 个媒体库")
         return {"count": len(opts)}
 
@@ -509,8 +541,7 @@ class Plugin(BasePlugin):
         #       只需 emby.api 授权 + 勾选 Emby 服务器，无需 files.read/目录映射。
         #    b) 本地模式：files.read 授权的本地目录素材图（需要 roots 目录映射）。
         cfg = self._plugin_config(ctx)
-        direct = EmbyDirect(input.get("embyUrl") or cfg.get("embyUrl") or "",
-                            input.get("embyApiKey") or cfg.get("embyApiKey") or "")
+        direct = self._direct_for_server(input, ctx, server_id)
         # 自动选库时 input 里没有 libraryId，用自动选中的库取图
         library_id = library_id_early or (str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None)
         poster_paths: list[str] = []
@@ -933,8 +964,10 @@ class Plugin(BasePlugin):
         """
         saved_ui = _storage_value(ctx.mt.storage.get(key="ui-settings")) or {}
         defaults = {
-            "serverId": None,
-            "libraryIds": [],
+            "serverId": _storage_value(ctx.mt.storage.get(key="active-server")),
+            "serverUrl": "",
+            "serverApiKey": "",
+            "libraryId": None,
             "sourceMode": "random",
             "layout": "扇形展开",
             "fontTitle": "剑豪体.ttf",
@@ -966,15 +999,27 @@ class Plugin(BasePlugin):
         return ui.page(
             ui.Card(
                 ui.Text(text="Cover Studio · 封面创作。默认随机从目标媒体库取背景图和海报。"),
-                ui.Select(label="服务器", bind="state.serverId",
+                ui.Text(text="多台 Emby：先在 MediaTidy 的 Emby 服务器设置中添加服务器，再在本插件授权中勾选它们。下方分别保存每台的连接信息，生成时切换服务器即可。"),
+                ui.Select(label="Emby 服务器", bind="state.serverId",
                           options=ui.ref("query.servers.data")),
+                ui.Details(
+                    ui.Input(label="此服务器 Emby 地址", bind="state.serverUrl"),
+                    ui.Input(label="此服务器 API Key（保存后页面不回显）", bind="state.serverApiKey"),
+                    ui.Button(label="添加 / 保存服务器连接", onClick=[{
+                        "type": "invoke", "actionId": "save-server",
+                        "input": {"serverId": ui.ref("state.serverId"),
+                                  "serverUrl": ui.ref("state.serverUrl"),
+                                  "serverApiKey": ui.ref("state.serverApiKey")},
+                    }, {"type": "host", "name": "refreshPage"}]),
+                    label="＋ 添加 Emby 服务器连接",
+                ),
                 ui.Button(label="加载 / 刷新媒体库", onClick=[{
                     "type": "invoke", "actionId": "load-libraries",
                     "input": {"serverId": ui.ref("state.serverId")},
                 }]),
-                ui.Select(label="媒体库（可多选）", bind="state.libraryIds",
-                          options=ui.ref("query.libraries.data"), multiple=True),
-                ui.Text(text="首次安装或切换服务器时，请先点“加载 / 刷新媒体库”；媒体库下拉框支持多选，勾选多个会分别生成封面。"),
+                ui.Select(label="媒体库", bind="state.libraryId",
+                          options=ui.ref("query.libraries.data")),
+                ui.Text(text="切换 Emby 服务器后，请先加载 / 刷新媒体库，再选择要生成封面的媒体库。"),
                 ui.Select(label="取图模式", bind="state.sourceMode", options=[
                     {"label": "随机取图", "value": "random"},
                     {"label": "最新入库", "value": "latest"},
@@ -1000,12 +1045,13 @@ class Plugin(BasePlugin):
                     {"label": "荣耀视界", "value": "荣耀视界"},
                     {"label": "聚焦C佬", "value": "聚焦C佬"},
                 ]),
-                ui.Text(text="点击后按钮会显示运行中，并自动切换到本次运行；静态封面通常数秒，动态封面约 15–40 秒。勾选多个媒体库会逐个生成并上传。"),
-                ui.Button(label="🚀 一键生成所选封面", onClick=[{
-                    "type": "invoke", "actionId": "generate-all",
+                ui.Text(text="点击后按钮会显示运行中，并自动切换到本次运行；静态封面通常数秒，动态封面约 15–40 秒。“生成全部”仅处理当前所选 Emby 服务器。"),
+                ui.Button(label="🚀 一键生成封面", onClick=[{
+                    "type": "invoke", "actionId": "generate-cover",
                     "input": {
                         "serverId": ui.ref("state.serverId"),
-                        "libraryIds": ui.ref("state.libraryIds"),
+                        "libraryId": ui.ref("state.libraryId"),
+                        "upload": True,
                         "sourceMode": ui.ref("state.sourceMode"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
@@ -1032,6 +1078,7 @@ class Plugin(BasePlugin):
                 ui.Button(label="🚀 一键生成全部媒体库", onClick=[{
                     "type": "invoke", "actionId": "generate-all",
                     "input": {
+                        "serverId": ui.ref("state.serverId"),
                         "sourceMode": ui.ref("state.sourceMode"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
