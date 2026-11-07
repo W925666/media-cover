@@ -718,11 +718,14 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @action("generate-all")
     def generate_all(self, input: dict, ctx: Context):
-        """一键生成全部媒体库（参考 cover-studio 的 generate 动作）。
+        """一键生成媒体库封面（参考 cover-studio 的 generate 动作）。
 
-        遍历全部媒体库逐个生成并上传，返回汇总；单个库失败不中断整体。
+        - 传入 libraryIds：只处理页面多选的媒体库（一个或多个）。
+        - 不传 libraryIds：处理全部媒体库。
+        遍历生成并上传，返回汇总；单个库失败不中断整体。
         """
-        server_id = self._first_server_id(ctx)
+        _sid = input.get("serverId")
+        server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
         if not server_id:
             raise ValueError("请先在设置中授权 Emby 服务器")
         result = ctx.mt.emby.request(
@@ -731,6 +734,15 @@ class Plugin(BasePlugin):
         libs = [r for r in rows if isinstance(r, dict) and r.get("Id") is not None]
         if not libs:
             raise ValueError("未读取到媒体库")
+        # 页面多选媒体库：传了 libraryIds 就只处理所选；未传（“一键生成全部”）处理全部。
+        if "libraryIds" in input:
+            wanted = input.get("libraryIds") or []
+            wanted_set = {str(x) for x in wanted if x not in (None, "")}
+            if not wanted_set:
+                raise ValueError("请先选择媒体库（下拉框可多选）")
+            libs = [r for r in libs if str(r.get("Id")) in wanted_set]
+            if not libs:
+                raise ValueError("所选媒体库不在当前服务器列表中，请先加载/刷新媒体库")
         ctx.mt.log(level="info", message=f"开始批量生成，共 {len(libs)} 个媒体库")
         # 先用全部媒体库名称选出同一款可覆盖所有字符的字体。此前每个库独立
         # fallback，某些名称会切到另一字体，视觉字面高度不同，看起来一大一小。
@@ -922,7 +934,7 @@ class Plugin(BasePlugin):
         saved_ui = _storage_value(ctx.mt.storage.get(key="ui-settings")) or {}
         defaults = {
             "serverId": None,
-            "libraryId": None,
+            "libraryIds": [],
             "sourceMode": "random",
             "layout": "扇形展开",
             "fontTitle": "剑豪体.ttf",
@@ -960,9 +972,9 @@ class Plugin(BasePlugin):
                     "type": "invoke", "actionId": "load-libraries",
                     "input": {"serverId": ui.ref("state.serverId")},
                 }]),
-                ui.Select(label="媒体库", bind="state.libraryId",
-                          options=ui.ref("query.libraries.data")),
-                ui.Text(text="首次安装或切换服务器时，请先点“加载 / 刷新媒体库”；加载完成后媒体库下拉框会显示已授权服务器中的媒体库。"),
+                ui.Select(label="媒体库（可多选）", bind="state.libraryIds",
+                          options=ui.ref("query.libraries.data"), multiple=True),
+                ui.Text(text="首次安装或切换服务器时，请先点“加载 / 刷新媒体库”；媒体库下拉框支持多选，勾选多个会分别生成封面。"),
                 ui.Select(label="取图模式", bind="state.sourceMode", options=[
                     {"label": "随机取图", "value": "random"},
                     {"label": "最新入库", "value": "latest"},
@@ -988,16 +1000,12 @@ class Plugin(BasePlugin):
                     {"label": "荣耀视界", "value": "荣耀视界"},
                     {"label": "聚焦C佬", "value": "聚焦C佬"},
                 ]),
-                ui.Text(text="点击后按钮会显示运行中，并自动切换到本次运行；静态封面通常数秒，动态封面约 15–40 秒。"),
-                ui.Button(label="🚀 一键生成封面", onClick=[{
-                    "type": "invoke", "actionId": "generate-cover",
+                ui.Text(text="点击后按钮会显示运行中，并自动切换到本次运行；静态封面通常数秒，动态封面约 15–40 秒。勾选多个媒体库会逐个生成并上传。"),
+                ui.Button(label="🚀 一键生成所选封面", onClick=[{
+                    "type": "invoke", "actionId": "generate-all",
                     "input": {
-                        # 下拉框初次打开时 state 可能是 null。允许 null 传到动作，
-                        # generate_cover 内部会自动选择首个已授权服务器/媒体库；用户
-                        # 手动选择后则原样使用选择值。避免引用 query 数组下标——MT UI
-                        # v2 的绑定路径语法不支持这种数组引用。
                         "serverId": ui.ref("state.serverId"),
-                        "libraryId": ui.ref("state.libraryId"),
+                        "libraryIds": ui.ref("state.libraryIds"),
                         "sourceMode": ui.ref("state.sourceMode"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
@@ -1017,7 +1025,6 @@ class Plugin(BasePlugin):
                         "badgeColorMode": ui.ref("state.badgeColorMode"),
                         "badgeTextColor": ui.ref("state.badgeTextColor"),
                         "badgeFollowTextColor": ui.ref("state.badgeFollowTextColor"),
-                        "upload": True,
                     },
                 }, {
                     "type": "host", "name": "refreshPage",
