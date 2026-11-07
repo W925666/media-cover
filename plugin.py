@@ -524,19 +524,19 @@ class Plugin(BasePlugin):
             config["title_size"] = _parse_size(input.get("titleSize"), 160)
         if input.get("subtitleSize") not in (None, ""):
             config["subtitle_size"] = _parse_size(input.get("subtitleSize"), 80)
-        # 英文副标题较长时限制为布局默认字号的 75%，防止窄文本区按字符
-        # 拆成两三行。用户明确填写 subtitleSize 时尊重自定义值。
+        # 英文副标题较长时限制字号，防止窄文本区按字符拆成两三行。
+        # 用户明确填写 subtitleSize 时尊重自定义值。
         if input.get("subtitleSize") in (None, "") and len(str(config.get("subtitle") or "")) >= 14:
             current_subtitle_size = int(config.get("subtitle_size") or 80)
-            config["subtitle_size"] = max(36, round(current_subtitle_size * 0.75))
+            # 许多 FrameBase 布局的副标题区域只有画布 1/3 左右，固定 80px
+            # 会把 CHINESE ANIMATION 拆行。自动副标题统一收敛到 48px。
+            config["subtitle_size"] = min(current_subtitle_size, 48)
         # 自由设计依赖画布元素。简化页面不提供设计器时，使用可见的通用构图，
         # 而不是只输出一张空色背景。
         if layout == "自由设计" and not config.get("designer_elements"):
             config["designer_elements"] = [
                 {"type": "backdrop", "x": 0, "y": 0, "w": 1920, "h": 1080,
                  "opacity": 100, "fit": "cover"},
-                {"type": "shape", "x": 0, "y": 0, "w": 1920, "h": 1080,
-                 "fill": "#07111c", "opacity": 48},
                 {"type": "poster", "assetIndex": 0, "x": 1110, "y": 120,
                  "w": 560, "h": 840, "radius": 42, "borderWidth": 5,
                  "borderColor": "#ffffff"},
