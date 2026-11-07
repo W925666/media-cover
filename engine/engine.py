@@ -147,14 +147,22 @@ class PosterEngine:
 
     @classmethod
     def _font_supports_text(cls, font, text):
-        characters = {char for char in str(text or "") if ord(char) > 127 and not char.isspace()}
+        return not cls._font_missing_characters(font, text)
+
+    @classmethod
+    def _font_missing_characters(cls, font, text):
+        """用真实字形签名检查任意 Unicode 名称，不依赖预设媒体库名称。"""
+        characters = {char for char in str(text or "") if not char.isspace()}
         if not characters:
-            return True
+            return []
         try:
             missing = cls._glyph_signature(font, chr(0x10FFFF))
-            return all(cls._glyph_signature(font, char) != missing for char in characters)
+            return sorted(
+                char for char in characters
+                if cls._glyph_signature(font, char) == missing
+            )
         except (OSError, ValueError):
-            return False
+            return sorted(characters)
 
     def _available_font_names(self):
         try:
@@ -190,20 +198,30 @@ class PosterEngine:
                 continue
         return font_filename
 
-    def resolve_font_filename_for_texts(self, font_filename, texts, size=96):
-        """选择能分别覆盖每个标题的统一字体，避免拼接文本检测漏掉缺字。"""
+    def resolve_font_filename_for_texts(self, font_filename, texts, size=96, return_missing=False):
+        """按运行时真实文本选择统一字体，支持任意用户命名和 Unicode 字符。"""
         size = max(8, min(500, int(size)))
         candidates = ([font_filename] if font_filename else []) + [
             name for name in self._available_font_names() if name != font_filename
         ]
+        best_name = font_filename
+        best_missing = None
+        all_text = list(texts or [])
         for name in candidates:
             try:
                 font = ImageFont.truetype(os.path.join(self.fonts_dir, name), size)
-                if all(self._font_supports_text(font, text) for text in texts):
-                    return name
+                missing = sorted({
+                    char for text in all_text
+                    for char in self._font_missing_characters(font, text)
+                })
+                if best_missing is None or len(missing) < len(best_missing):
+                    best_name, best_missing = name, missing
+                if not missing:
+                    return (name, []) if return_missing else name
             except OSError:
                 continue
-        return font_filename
+        result = (best_name, best_missing or [])
+        return result if return_missing else best_name
 
     def _load_text_font(self, font_filename, size, text=""):
         size = max(8, min(500, int(size)))

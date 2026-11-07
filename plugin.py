@@ -746,8 +746,9 @@ class Plugin(BasePlugin):
         # fallback，某些名称会切到另一字体，视觉字面高度不同，看起来一大一小。
         batch_input = dict(input or {})
         all_names = [str(lib.get("Name") or "") for lib in libs]
-        chosen_title_font = self.engine().resolve_font_filename_for_texts(
-            batch_input.get("fontTitle") or "剑豪体.ttf", all_names, 96
+        chosen_title_font, title_missing = self.engine().resolve_font_filename_for_texts(
+            batch_input.get("fontTitle") or "剑豪体.ttf", all_names, 96,
+            return_missing=True,
         )
         if chosen_title_font:
             batch_input["fontTitle"] = chosen_title_font
@@ -766,18 +767,35 @@ class Plugin(BasePlugin):
             "WESTERN TV SERIES", "HONG KONG & TAIWAN DRAMA",
             "DOCUMENTARY FILMS", "CONCERTS", "LTX MEDIA", "MEDIA LIBRARY",
         ]
-        chosen_subtitle_font = self.engine().resolve_font_filename_for_texts(
+        # 加入用户可能输入的自定义副标题；没有自定义值时检查全部自动语义文本。
+        requested_subtitle = str(batch_input.get("subtitle") or "").strip()
+        subtitle_texts = [requested_subtitle] if requested_subtitle else subtitle_samples
+        chosen_subtitle_font, subtitle_missing = self.engine().resolve_font_filename_for_texts(
             batch_input.get("fontSubtitle") or batch_input.get("fontTitle") or "OPPOSans-B.ttf",
-            subtitle_samples, 64,
+            subtitle_texts, 64, return_missing=True,
         )
-        chosen_badge_font = self.engine().resolve_font_filename_for_texts(
+        chosen_badge_font, badge_missing = self.engine().resolve_font_filename_for_texts(
             batch_input.get("badgeFont") or batch_input.get("fontTitle") or "OPPOSans-B.ttf",
-            ["0123456789"], 64,
+            ["0123456789"], 64, return_missing=True,
         )
         if chosen_subtitle_font:
             batch_input["fontSubtitle"] = chosen_subtitle_font
         if chosen_badge_font:
             batch_input["badgeFont"] = chosen_badge_font
+        unresolved = {
+            "标题": title_missing,
+            "副标题": subtitle_missing,
+            "角标": badge_missing,
+        }
+        for label, missing_chars in unresolved.items():
+            if missing_chars:
+                rendered = " ".join(
+                    f"{char}(U+{ord(char):04X})" for char in missing_chars[:30]
+                )
+                ctx.mt.log(
+                    level="warn",
+                    message=f"{label}仍有未覆盖字形：{rendered}",
+                )
         ctx.mt.log(level="info", message=(
             f"批量参数已锁定：布局={batch_input.get('layout') or '默认'}，"
             f"标题字体={batch_input.get('fontTitle') or '默认'}，"
