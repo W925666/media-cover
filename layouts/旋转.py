@@ -338,7 +338,8 @@ def render(ctx, bg, config, assets, fonts):
     sy = int(height * (float(config.get('subtitle_pos_y', 55)) / 100))
     mw_sub = int(width * (float(config.get('sub_width_pct', 40)) / 100))
     
-    tx, sx = max(0, min(tx, width - 4)), max(0, min(sx, width - 3))
+    tx = max(0, min(tx, width - 4))
+    sx = tx  # 主副标题共享同一列，预设遗留 subtitle_pos_x 不再造成偏移。
     mw_title = max(1, min(mw_title, width - tx - 3))
     mw_sub = max(1, min(mw_sub, width - sx - 2))
     f_sub_path, sub_height = _fit_text_block(ctx, f_sub_path, subtitle_str, mw_sub, height * 0.25)

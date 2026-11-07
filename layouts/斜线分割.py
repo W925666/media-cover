@@ -269,7 +269,8 @@ def render(ctx, bg, config, assets, fonts):
     sw = int(w * float(config.get('sub_width_pct', 40)) / 100)
     
     # 居中锚点两侧都为阴影留边；显式换行保留，其余行先缩字。
-    tx, sx = max(12, min(tx, w - 12)), max(7, min(sx, w - 7))
+    tx = max(12, min(tx, w - 12))
+    sx = tx  # 保留上游居中构图，主副标题共用中心轴。
     tw = max(1, min(tw, 2 * min(tx, w - tx - 11)))
     sw = max(1, min(sw, 2 * min(sx, w - sx - 6)))
     def fit_block(font, text, max_width, available_height):

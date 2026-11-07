@@ -32,8 +32,24 @@ def main():
             fonts = {'main': engine._load_text_font('OPPOSans-B.ttf', int(config.get('title_size',160)),config['title']),
                      'sub': engine._load_text_font('剑豪体.ttf',int(config.get('subtitle_size',config.get('sub_size',80))),config['subtitle']),
                      'count':engine._load_text_font('OPPOSans-B.ttf',40,'2505')}
-            result = render(engine, Image.new('RGBA',(1920,1080),(25,30,40,255)),config,
-                            {'posters':paths,'bg_url':paths[0],'backdrops':paths,'poster_backdrops':paths,'count':2505},fonts)
+            # 故意注入旧预设不同横坐标，确认副标题跟随主标题而非各自漂移。
+            config.update(title_pos_x=12, subtitle_pos_x=22, title_x=23, sub_x=31, subtitle_x=31)
+            calls = []
+            original = engine.draw_text_wrapper
+            def tracked(draw, text, x, y, font, max_width, fill, *args, **kwargs):
+                calls.append((str(text), x, kwargs.get('align', 'left'), fill))
+                return original(draw, text, x, y, font, max_width, fill, *args, **kwargs)
+            engine.draw_text_wrapper = tracked
+            try:
+                result = render(engine, Image.new('RGBA',(1920,1080),(25,30,40,255)),config,
+                                {'posters':paths,'bg_url':paths[0],'backdrops':paths,'poster_backdrops':paths,'count':2505},fonts)
+            finally:
+                engine.draw_text_wrapper = original
+            title_calls = [c for c in calls if c[0] in config['title'].splitlines() or c[0] == config['title']]
+            subtitle_calls = [c for c in calls if c[0] == config['subtitle']]
+            if title_calls and subtitle_calls:
+                # 最后一遍为正文，前面的阴影坐标有刻意偏移。
+                assert title_calls[-1][1:3] == subtitle_calls[-1][1:3], (name, title_calls[-1][:3], subtitle_calls[-1][:3])
             assert result.size==(1920,1080), (name,result.size)
             result.convert('RGB').save(output/(name+('-long' if long else '-short')+'.jpg'))
             result.close()

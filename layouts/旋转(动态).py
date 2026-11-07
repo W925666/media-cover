@@ -281,13 +281,14 @@ def _draw_text(ctx, canvas, config, fonts):
             font = font.font_variant(size=font.size - 1)
         return font, block_height()
 
-    sub_x = max(0, min(int(width * float(config.get("subtitle_pos_x", 6)) / 100), width - shadow_dx - 1))
+    text_x = max(shadow_dx, min(int(width * float(config.get("title_pos_x", 6)) / 100), width - shadow_dx - 1))
+    sub_x = text_x
     sub_width = max(1, min(int(width * float(config.get("sub_width_pct", 40)) / 100), width - sub_x - shadow_dx))
     subtitle_font, sub_height = fit_block(subtitle_font, subtitle, sub_width, height * 0.25)
     gap = max(shadow_dx + 2, round(subtitle_font.size * 0.28))
     title_bottom = 0
     if title:
-        x = int(width * float(config.get("title_pos_x", 6)) / 100)
+        x = text_x
         y = int(height * float(config.get("title_pos_y", 38)) / 100)
         max_width = int(width * float(config.get("title_width_pct", 40)) / 100)
         title_lines = str(title).splitlines() or [str(title)]
