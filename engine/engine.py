@@ -246,12 +246,18 @@ class PosterEngine:
             rgb = colorsys.hsv_to_rgb(hue, 0.78, 1.0)
             return tuple(round(v * 255) for v in rgb) + (max(0, min(255, int(opacity))),)
         if mode == 'rainbow':
-            # 整段文字使用同一种颜色，并按红橙黄绿青蓝紫循环，形成闪烁彩虹。
+            # 同一帧同时显示红橙黄绿青蓝紫离散色带；动态图逐帧轮换色带位置。
+            # 这与 random 的“整段文字只有一种随机色”有明显区别。
+            palette = ('#ff1744', '#ff7a00', '#ffd600', '#00e676', '#00d9ff', '#2979ff', '#8e24ff')
             phase = float(config.get('frame_color_phase', 0.0)) % 1.0
-            rainbow_hues = (0.0, 0.075, 0.15, 0.33, 0.50, 0.62, 0.78, 0.90)
-            hue = rainbow_hues[int(phase * len(rainbow_hues)) % len(rainbow_hues)]
-            rgb = colorsys.hsv_to_rgb(hue, 0.90, 1.0)
-            return tuple(round(v * 255) for v in rgb) + (max(0, min(255, int(opacity))),)
+            shift = int(phase * len(palette)) % len(palette)
+            colors = palette[shift:] + palette[:shift]
+            return {
+                'colors': colors,
+                'direction': config.get(f'{prefix}_gradient_direction', 'horizontal'),
+                'opacity': max(0, min(255, int(opacity))),
+                'discrete': True,
+            }
         if mode != 'gradient':
             return self._rgba(solid, opacity, fallback)
         return {
@@ -265,10 +271,13 @@ class PosterEngine:
         }
 
     @staticmethod
-    def _gradient_color(colors, progress):
+    def _gradient_color(colors, progress, discrete=False):
         progress = max(0.0, min(1.0, progress))
-        segment = min(1, int(progress * 2))
-        local = progress * 2 - segment
+        if discrete:
+            return colors[min(len(colors) - 1, int(progress * len(colors)))]
+        span = max(1, len(colors) - 1)
+        segment = min(span - 1, int(progress * span))
+        local = progress * span - segment
         start = colors[segment]
         end = colors[segment + 1]
         return tuple(round(start[i] + (end[i] - start[i]) * local) for i in range(4))
@@ -280,17 +289,18 @@ class PosterEngine:
         while len(colors) < 3:
             colors.append(colors[-1])
         direction = paint.get('direction', 'horizontal')
+        discrete = bool(paint.get('discrete'))
         image = Image.new('RGBA', (width, height), colors[0])
         gradient_draw = ImageDraw.Draw(image)
 
         if direction == 'vertical':
             span = max(1, height - 1)
             for y in range(height):
-                gradient_draw.line((0, y, width, y), fill=self._gradient_color(colors, y / span))
+                gradient_draw.line((0, y, width, y), fill=self._gradient_color(colors, y / span, discrete))
         elif direction in ('diagonal_down', 'diagonal_up'):
             span = max(1, width + height - 2)
             for offset in range(width + height - 1):
-                color = self._gradient_color(colors, offset / span)
+                color = self._gradient_color(colors, offset / span, discrete)
                 x1 = max(0, offset - (height - 1))
                 x2 = min(width - 1, offset)
                 if direction == 'diagonal_down':
@@ -300,7 +310,7 @@ class PosterEngine:
         else:
             span = max(1, width - 1)
             for x in range(width):
-                gradient_draw.line((x, 0, x, height), fill=self._gradient_color(colors, x / span))
+                gradient_draw.line((x, 0, x, height), fill=self._gradient_color(colors, x / span, discrete))
         return image
 
     def _paint_mask(self, target, mask, paint):

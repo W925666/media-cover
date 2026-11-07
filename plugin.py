@@ -956,7 +956,7 @@ class Plugin(BasePlugin):
                     {"label": "彩虹闪烁", "value": "rainbow"},
                 ]),
                 ui.Input(label="副标题固定颜色（HEX）", bind="state.subtitleColor"),
-                ui.Text(text="彩虹闪烁：整段文字按红橙黄绿青蓝紫逐色闪动，角标选择跟随主标题后会同步闪烁。"),
+                ui.Text(text="彩虹闪烁：同一帧文字同时显示红橙黄绿青蓝紫色带，动态时色带位置会逐帧轮换；随机颜色则整段文字一次只显示一种随机色。"),
                 ui.Button(label="💾 保存资源与标题设置", onClick=[{
                     "type": "invoke", "actionId": "save-settings",
                     "input": {
