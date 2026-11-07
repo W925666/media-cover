@@ -186,41 +186,29 @@ def render(ctx, bg, config, assets, fonts):
         # 取出 max_count 个
         poster_urls = [next(cycled_urls) for _ in range(max_count)]
     
-    # 预加载并处理所有图片
-    processed_images = []
+    # 按列处理：不同时常驻九张阴影海报与整列旋转副本。
     
     # 制作圆角蒙版
     mask = Image.new("L", (cell_w, cell_h), 0)
     draw_mask = ImageDraw.Draw(mask)
     draw_mask.rounded_rectangle([(0,0), (cell_w, cell_h)], radius=radius, fill=255)
     
-    for i in range(max_count):
-        url = poster_urls[i]
-        img = ctx.download_img(url)
-        if not img: 
-            # 如果下载失败，创建一个纯色块代替，防止报错
-            img = Image.new("RGB", (cell_w, cell_h), (50, 50, 50))
-        
-        # 裁剪并缩放
-        img = ImageOps.fit(img, (cell_w, cell_h), method=Image.LANCZOS)
-        
-        # 应用圆角
-        img_rgba = img.convert("RGBA")
-        base = Image.new("RGBA", (cell_w, cell_h), (0,0,0,0))
-        base.paste(img_rgba, (0,0), mask=mask)
-        
-        # 添加阴影
-        img_shadow = add_shadow(base, offset=(15, 15), blur_radius=15, shadow_color=(0,0,0,180))
-        processed_images.append(img_shadow)
-        
     # --- 分列渲染核心逻辑 ---
     for col_idx in range(cols):
-        # 提取当前列的图片索引: [0,1,2], [3,4,5], [6,7,8]
         col_imgs = []
         for row_idx in range(rows):
-            idx = col_idx * rows + row_idx
-            if idx < len(processed_images):
-                col_imgs.append(processed_images[idx])
+            source = ctx.download_img(poster_urls[col_idx * rows + row_idx])
+            if source is None:
+                source = Image.new('RGB', (cell_w, cell_h), (50, 50, 50))
+            fitted = ImageOps.fit(source, (cell_w, cell_h), method=Image.LANCZOS)
+            source.close()
+            rgba = fitted.convert('RGBA')
+            fitted.close()
+            base = Image.new('RGBA', (cell_w, cell_h), (0, 0, 0, 0))
+            base.paste(rgba, (0, 0), mask=mask)
+            rgba.close()
+            col_imgs.append(add_shadow(base, offset=(15, 15), blur_radius=15, shadow_color=(0, 0, 0, 180)))
+            base.close()
         
         if not col_imgs: continue
         
@@ -254,6 +242,14 @@ def render(ctx, bg, config, assets, fonts):
         
         # 绘制到背景
         bg.paste(rotated_col, (int(col_base_x), int(col_base_y)), rotated_col)
+        rotated_col.close()
+        col_canvas.close()
+        for card in col_imgs:
+            card.close()
+        col_imgs.clear()
+    mask.close()
+    if first_img is not None:
+        first_img.close()
 
     # --- 3. 绘制文字 ---
     draw = ImageDraw.Draw(bg)

@@ -484,7 +484,8 @@ class PosterEngine:
         scale = 4
         w, h = img.size
         overlay_w, overlay_h = w * scale, h * scale
-        overlay = Image.new('RGBA', (overlay_w, overlay_h), (0,0,0,0))
+        # 4x 抗锯齿只用于角标局部；禁止创建 7680x4320 全画布图层。
+        overlay = Image.new('RGBA', (1, 1), (0,0,0,0))
         safe_margin = 8 * scale
         try: badge_x_percent = max(0.0, min(100.0, float(config.get('badge_x_percent', 2))))
         except (TypeError, ValueError): badge_x_percent = 2.0
@@ -547,13 +548,21 @@ class PosterEngine:
             if not content_box:
                 return
             content = content.crop(content_box)
-            positioned = Image.new('RGBA', (overlay_w, overlay_h), (0, 0, 0, 0))
             available_w = max(0, overlay_w - content.width - safe_margin * 2)
             available_h = max(0, overlay_h - content.height - safe_margin * 2)
             position_x = safe_margin + int(available_w * badge_x_percent / 100)
             position_y = safe_margin + int(available_h * badge_y_percent / 100)
-            positioned.alpha_composite(content, (position_x, position_y))
-            overlay.alpha_composite(positioned)
+            # 保留亚像素位置：在局部小图添加最多 scale-1 像素偏移。
+            offset_x, offset_y = position_x % scale, position_y % scale
+            local = Image.new('RGBA', (content.width + offset_x + scale * 2,
+                                       content.height + offset_y + scale * 2), (0, 0, 0, 0))
+            local.alpha_composite(content, (offset_x, offset_y))
+            reduced = local.resize((max(1, math.ceil(local.width / scale)),
+                                    max(1, math.ceil(local.height / scale))), Image.LANCZOS)
+            img.alpha_composite(reduced, (position_x // scale, position_y // scale))
+            reduced.close()
+            local.close()
+            content.close()
 
         if style == 'ribbon':
             padding_v = 40 * scale
@@ -869,8 +878,8 @@ class PosterEngine:
                 content = content.rotate(-3 - effect_ratio * 4, resample=Image.BICUBIC, expand=True)
             place_content(content)
 
-        overlay_resized = overlay.resize((w, h), resample=Image.LANCZOS)
-        return Image.alpha_composite(img, overlay_resized)
+        overlay.close()
+        return img
 
     @staticmethod
     def _balanced_library_title(text):
