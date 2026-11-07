@@ -161,7 +161,14 @@ class PosterEngine:
 
     @classmethod
     def _font_supports_text(cls, font, text):
-        return not cls._font_missing_characters(font, text)
+        characters = {char for char in str(text or "") if ord(char) > 127 and not char.isspace()}
+        if not characters:
+            return True
+        try:
+            missing = cls._glyph_signature(font, chr(0x10FFFF))
+            return all(cls._glyph_signature(font, char) != missing for char in characters)
+        except (OSError, ValueError):
+            return False
 
     @classmethod
     def _font_missing_characters(cls, font, text):
@@ -187,7 +194,6 @@ class PosterEngine:
         except OSError:
             return []
         preferred = [
-            "NotoSansCJKsc-Bold.otf",
             "OPPOSans-B.ttf",
             "优设标题黑.ttf",
             "仓耳舒圆体W02.ttf",
@@ -262,23 +268,16 @@ class PosterEngine:
     def draw_text_wrapper(self, draw, text, x, y, font, max_width, fill, line_spacing=10, align='left'):
         if not text: return y
         lines = []
-        # 尊重显式换行；其余文本仍按实际字体宽度自动折行。这样所有布局都能
-        # 统一显示长媒体库名，而不是只在某个布局里打补丁。
-        paragraphs = str(text).splitlines() or [str(text)]
-        for paragraph in paragraphs:
-            if not paragraph:
-                lines.append("")
-                continue
-            current_line = ""
-            for char in paragraph:
-                test_line = current_line + char
-                try: w = font.getlength(test_line)
-                except: w = font.getbbox(test_line)[2]
-                if w <= max_width: current_line = test_line
-                else:
-                    if current_line: lines.append(current_line)
-                    current_line = char
-            if current_line: lines.append(current_line)
+        current_line = ""
+        for char in text:
+            test_line = current_line + char
+            try: w = font.getlength(test_line)
+            except: w = font.getbbox(test_line)[2]
+            if w <= max_width: current_line = test_line
+            else:
+                if current_line: lines.append(current_line)
+                current_line = char
+        if current_line: lines.append(current_line)
 
         try: font_height = font.getmetrics()[0] + font.getmetrics()[1] + line_spacing
         except: bbox = font.getbbox("Hg"); font_height = (bbox[3] - bbox[1]) + line_spacing
@@ -906,7 +905,7 @@ class PosterEngine:
     # === 动态 GIF 生成 ===
     def draw(self, config, assets):
         config = dict(config)
-        if config.get('auto_wrap_library_title', True):
+        if config.get('auto_wrap_library_title', False):
             config['title'] = self._balanced_library_title(config.get('title', ''))
         bg = None
         if assets.get('bg_url'):

@@ -397,7 +397,7 @@ class Plugin(BasePlugin):
     @action("save-settings")
     def save_settings(self, input: dict, ctx: Context):
         allowed = (
-            "sourceMode", "layout", "fontTitle", "fontSubtitle",
+            "renderingStyle", "sourceMode", "layout", "fontTitle", "fontSubtitle",
             "badgeStyle", "badgeFont", "badgeSize", "posterCount",
             "title", "subtitle", "titleSize", "subtitleSize", "titleColorMode", "titleColor",
             "subtitleColorMode", "subtitleColor", "badgeColorMode",
@@ -680,6 +680,20 @@ class Plugin(BasePlugin):
             ).lstrip("_")
             config[snake] = int(num) if num == int(num) else num
 
+        # 原版模式不让此前全局 UI 默认值覆盖各布局自己的字体/字号/角标。
+        # 用户保存值继续保留，切换自定义模式即可重新使用。
+        if input.get('renderingStyle', 'original') == 'original':
+            original = self._layout_defaults(layout)
+            protected = ('font_', 'title_', 'subtitle_', 'sub_', 'badge_', 'count_')
+            for key in list(config):
+                if key.startswith(protected) and key not in ('title', 'subtitle'):
+                    config.pop(key)
+            config.update({key: value for key, value in original.items()
+                           if key.startswith(protected) and key not in ('title', 'subtitle')})
+            config['auto_wrap_library_title'] = False
+            config['original_typography'] = True
+            config.pop('force_uniform_title_font', None)
+
         ctx.mt.log(level="info", message=f"生成封面：标题={title}, 布局={layout}, 素材={len(poster_paths)} 张")
         b64 = self.engine().draw(config, assets)
         image_bytes = base64.b64decode(b64)
@@ -954,6 +968,7 @@ class Plugin(BasePlugin):
             "serverUrl": "",
             "serverApiKey": "",
             "libraryId": None,
+            "renderingStyle": "original",
             "sourceMode": "random",
             "layout": "扇形展开",
             "fontTitle": "剑豪体.ttf",
@@ -1015,6 +1030,11 @@ class Plugin(BasePlugin):
                 ui.Select(label="媒体库", bind="state.libraryId",
                           options=ui.ref("query.libraries.data")),
                 ui.Text(text="切换 Emby 服务器后，请先加载 / 刷新媒体库，再选择要生成封面的媒体库。"),
+                ui.Select(label="渲染风格", bind="state.renderingStyle", options=[
+                    {"label": "FrameBase 原版（默认，使用布局自带字体/字号/角标）", "value": "original"},
+                    {"label": "自定义（应用下方已保存的字体/字号/颜色/角标）", "value": "custom"},
+                ]),
+                ui.Text(text="原版模式恢复上游排版与预设，不应用下方全局文字和角标覆盖；自定义设置仍保留。动态输出仍使用低内存编码，未承诺 GIF 字节或所有帧与上游完全一致。"),
                 ui.Select(label="取图模式", bind="state.sourceMode", options=[
                     {"label": "随机取图", "value": "random"},
                     {"label": "最新入库", "value": "latest"},
@@ -1047,6 +1067,7 @@ class Plugin(BasePlugin):
                         "serverId": ui.ref("state.serverId"),
                         "libraryId": ui.ref("state.libraryId"),
                         "upload": True,
+                        "renderingStyle": ui.ref("state.renderingStyle"),
                         "sourceMode": ui.ref("state.sourceMode"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
@@ -1074,6 +1095,7 @@ class Plugin(BasePlugin):
                     "type": "invoke", "actionId": "generate-all",
                     "input": {
                         "serverId": ui.ref("state.serverId"),
+                        "renderingStyle": ui.ref("state.renderingStyle"),
                         "sourceMode": ui.ref("state.sourceMode"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
@@ -1171,6 +1193,7 @@ class Plugin(BasePlugin):
                 ui.Button(label="💾 保存当前设置", onClick=[{
                     "type": "invoke", "actionId": "save-settings",
                     "input": {
+                        "renderingStyle": ui.ref("state.renderingStyle"),
                         "sourceMode": ui.ref("state.sourceMode"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),

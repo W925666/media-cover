@@ -180,33 +180,25 @@ def _draw_text(ctx, canvas, config, fonts):
     subtitle_font = fonts.get("font_subtitle") or fonts.get("sub") or title_font
     title = config.get("title", "")
     subtitle = config.get("subtitle", "")
-    def fit_block(font, text, available_height):
-        lines = str(text or '').splitlines() or ['']
-        font = ctx.fit_single_line_font(font, max(lines, key=font.getlength), max(1, width - 4))
-        def block_height():
-            ascent, descent = font.getmetrics()
-            return len(lines) * (ascent + descent + 10)
-        while font.size > 1 and block_height() > available_height:
-            font = font.font_variant(size=font.size - 1)
-        return font, block_height()
-
-    subtitle_font, sub_height = fit_block(subtitle_font, subtitle, height * 0.25)
-    gap = max(4, round(subtitle_font.size * 0.28))
-    reserve = sub_height + gap + 2 if subtitle else 2
-    title_y = max(0, min(height // 2 + int(config.get("title_offset_y", -400)), height - reserve - 13 * len(str(title or '').splitlines() or [''])))
-    title_font, _ = fit_block(title_font, title, height - title_y - reserve)
-    title_bottom = 0
     if title:
-        title_bottom = ctx.draw_text_wrapper(
-            draw, title, width // 2, title_y, title_font, width - 4,
+        ctx.draw_text_wrapper(
+            draw,
+            title,
+            width // 2,
+            height // 2 + int(config.get("title_offset_y", -400)),
+            title_font,
+            width,
             ctx.resolve_text_fill(config, "title", "#FFFFFF", config.get("title_opacity", 255)),
             align="center",
         )
     if subtitle:
-        configured_y = height // 2 + int(config.get("subtitle_offset_y", -171))
-        subtitle_y = max(0, min(configured_y, height - sub_height - 2), title_bottom + gap if title else 0)
         ctx.draw_text_wrapper(
-            draw, subtitle, width // 2, subtitle_y, subtitle_font, width - 4,
+            draw,
+            subtitle,
+            width // 2,
+            height // 2 + int(config.get("subtitle_offset_y", -171)),
+            subtitle_font,
+            width,
             ctx.resolve_text_fill(config, "subtitle", "#AAAAAA", config.get("subtitle_opacity", 210)),
             align="center",
         )

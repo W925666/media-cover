@@ -1,34 +1,6 @@
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 
 
-def _fit_text_block(ctx, title, subtitle, title_font, subtitle_font, width, height, gap):
-    width, height = max(1, width), max(1, height)
-    for text, is_sub in ((title, False), (subtitle, True)):
-        font = subtitle_font if is_sub else title_font
-        if text and (is_sub or str(text).isascii()):
-            for line in str(text).splitlines():
-                font = ctx.fit_single_line_font(font, line, width)
-        if is_sub:
-            subtitle_font = font
-        else:
-            title_font = font
-    def text_height(text, font):
-        class Measure:
-            def text(self, *args, **kwargs):
-                pass
-        return ctx.draw_text_wrapper(Measure(), text, 0, 0, font, width, '#FFFFFF') if text else 0
-    gap = max(0, gap) if title and subtitle else 0
-    while text_height(title, title_font) + gap + text_height(subtitle, subtitle_font) > height:
-        if not any(text and getattr(font, 'size', 1) > 1 for text, font in ((title, title_font), (subtitle, subtitle_font))):
-            gap = 0
-            break
-        if title and getattr(title_font, 'size', 1) > 1:
-            title_font = title_font.font_variant(size=title_font.size - 1)
-        if subtitle and getattr(subtitle_font, 'size', 1) > 1:
-            subtitle_font = subtitle_font.font_variant(size=subtitle_font.size - 1)
-    return title_font, subtitle_font, gap
-
-
 def add_rounded_corners(image, radius):
     if radius <= 0:
         return image.convert('RGBA')
@@ -88,21 +60,16 @@ def _draw_stack(ctx, canvas, config, pairs, active_index):
         return canvas
 
     width, height = canvas.size
-    # 动态 GIF 会直接按最终尺寸（默认 533×300）渲染。这里的尺寸参数来自
-    # FrameBase 的 1920×1080 预设，必须随画布等比缩放，否则海报会比画布还高、
-    # 堆叠间距也会把后排海报全部推出画面。
-    design_scale = width / 1920.0
     scale = float(config.get('poster_scale', 0.9))
-    front_h = max(1, int(550 * scale * design_scale))
-    front_w = max(1, int(366 * scale * design_scale))
+    front_h, front_w = int(550 * scale), int(366 * scale)
     anchor_x = int(width * (float(config.get('poster_x_percent', 55)) / 100))
     anchor_y = int(height * (float(config.get('poster_y_percent', 50)) / 100))
-    offset_step = int(float(config.get('poster_gap', 140)) * scale * design_scale)
-    radius = max(0, int(float(config.get('poster_radius', 20)) * design_scale))
+    offset_step = int(config.get('poster_gap', 140) * scale)
+    radius = int(config.get('poster_radius', 20))
     poster_brightness = float(config.get('poster_brightness', 1.0))
     shadow_opacity = int(config.get('poster_shadow_opacity', 160))
-    shadow_blur = max(0, int(config.get('shadow_blur', 15)))
-    shadow_offset = int(float(config.get('shadow_offset', 10)) * design_scale)
+    shadow_blur = int(config.get('shadow_blur', 15))
+    shadow_offset = int(config.get('shadow_offset', 10))
 
     for depth in range(len(poster_urls) - 1, -1, -1):
         poster = ctx.download_img(poster_urls[depth])
@@ -130,9 +97,8 @@ def _draw_stack(ctx, canvas, config, pairs, active_index):
         layer.alpha_composite(shadow)
         layer.alpha_composite(poster, (margin, margin))
 
-        # 预设中的锚点表示首张海报中心，而不是左上角。
-        pos_x = anchor_x - front_w // 2 + depth * offset_step - margin
-        pos_y = anchor_y - front_h // 2 + (front_h - target_h) // 2 - margin
+        pos_x = anchor_x + depth * offset_step - margin
+        pos_y = anchor_y + (front_h - target_h) // 2 - margin
         if pos_x < width + 200:
             canvas.alpha_composite(layer, (pos_x, pos_y))
     return canvas
@@ -157,17 +123,12 @@ def _draw_overlay_and_text(ctx, canvas, config, fonts):
     title_fill = ctx.resolve_text_fill(config, 'title', '#FFFFFF', config.get('title_opacity', 255))
     subtitle_fill = ctx.resolve_text_fill(config, 'subtitle', '#DDDDDD', config.get('subtitle_opacity', 200))
 
-    x = max(0, min(width - 1, x))
-    y = max(0, min(height - 1, y))
-    max_width = max(1, min(max_width, width - x))
     title = config.get('title', '')
-    subtitle = config.get('subtitle', '')
-    title_font, subtitle_font, gap = _fit_text_block(
-        ctx, title, subtitle, title_font, subtitle_font, max_width, height - y, int(config.get('gap_1', 20)))
     if title:
         y = ctx.draw_text_wrapper(draw, title, x, y, title_font, max_width, title_fill)
-        y += gap
-    if subtitle and y < height:
+        y += int(config.get('gap_1', 20))
+    subtitle = config.get('subtitle', '')
+    if subtitle:
         ctx.draw_text_wrapper(draw, subtitle, x, y, subtitle_font, max_width, subtitle_fill)
     return canvas
 

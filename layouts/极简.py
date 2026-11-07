@@ -1,33 +1,5 @@
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
-def _fit_text_block(ctx, title, subtitle, title_font, subtitle_font, width, height, gap):
-    width, height = max(1, width), max(1, height)
-    for text, is_sub in ((title, False), (subtitle, True)):
-        font = subtitle_font if is_sub else title_font
-        if text and (is_sub or str(text).isascii()):
-            for line in str(text).splitlines():
-                font = ctx.fit_single_line_font(font, line, width)
-        if is_sub:
-            subtitle_font = font
-        else:
-            title_font = font
-    def text_height(text, font):
-        class Measure:
-            def text(self, *args, **kwargs):
-                pass
-        return ctx.draw_text_wrapper(Measure(), text, 0, 0, font, width, '#FFFFFF') if text else 0
-    gap = max(0, gap) if title and subtitle else 0
-    while text_height(title, title_font) + gap + text_height(subtitle, subtitle_font) > height:
-        if not any(text and getattr(font, 'size', 1) > 1 for text, font in ((title, title_font), (subtitle, subtitle_font))):
-            gap = 0
-            break
-        if title and getattr(title_font, 'size', 1) > 1:
-            title_font = title_font.font_variant(size=title_font.size - 1)
-        if subtitle and getattr(subtitle_font, 'size', 1) > 1:
-            subtitle_font = subtitle_font.font_variant(size=subtitle_font.size - 1)
-    return title_font, subtitle_font, gap
-
-
 # === 1. 定义布局参数 (已重构顺序) ===
 def get_schema():
     return [
@@ -69,12 +41,12 @@ def get_schema():
                 {"key": "font_title", "label": "主标题字体", "type": "font", "default": "default.ttf"},
                 {"key": "title_size", "label": "主标题字号", "type": "range", "min": 50, "max": 400, "default": 180},
                 {"key": "title_color", "label": "主标题颜色", "type": "color", "default": "#FFFFFF"},
-                
+
                 # 副标题
                 {"key": "font_subtitle", "label": "副标题字体", "type": "font", "default": "default.ttf"},
                 {"key": "subtitle_size", "label": "副标题字号", "type": "range", "min": 30, "max": 200, "default": 90},
                 {"key": "subtitle_color", "label": "副标题颜色", "type": "color", "default": "#DDDDDD"},
-                
+
                 # 排版位置
                 {"key": "text_align", "label": "文字对齐方式", "type": "select", "options": [
                     {"label": "左对齐", "value": "left"},
@@ -92,13 +64,13 @@ def get_schema():
 # === 2. 渲染入口函数 ===
 def render(ctx, bg, config, assets, fonts):
     width, height = bg.size
-    
+
     # === 1. 背景处理 ===
     # 模糊
     blur_radius = int(config.get('blur_radius', 0))
     if blur_radius > 0:
         bg = bg.filter(ImageFilter.GaussianBlur(blur_radius))
-        
+
     # 亮度
     brightness = float(config.get('brightness', 0.7))
     if brightness != 1.0:
@@ -108,7 +80,7 @@ def render(ctx, bg, config, assets, fonts):
     mask_opacity = int(config.get('mask_opacity', 180))
     mask_coverage = int(config.get('mask_coverage', 100))
     direction = config.get('mask_direction', 'horizontal')
-    
+
     mask = ctx.create_smart_mask(width, height, mask_opacity, mask_coverage, direction)
     black_layer = Image.new('RGBA', (width, height), (0,0,0,255))
     black_layer.putalpha(mask)
@@ -116,13 +88,13 @@ def render(ctx, bg, config, assets, fonts):
 
     # === 3. 绘制文字 ===
     draw = ImageDraw.Draw(bg)
-    
+
     # 布局参数
     align = config.get('text_align', 'left')
     cx = int(width * (float(config.get('text_left_percent', 10)) / 100))
     cy = int(height * (float(config.get('text_top_percent', 60)) / 100))
     mw = int(width * (float(config.get('text_width_percent', 80)) / 100))
-    
+
     # 字体与颜色参数
     # 优先获取新版 key，兼容旧版 key
     f_title = fonts.get('font_title') or fonts.get('main')
@@ -130,20 +102,18 @@ def render(ctx, bg, config, assets, fonts):
 
     c_title = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
     c_sub = ctx.resolve_text_fill(config, 'subtitle', '#DDDDDD')
-    
-    cx = max(0, min(width - 1, cx))
-    cy = max(0, min(height - 1, cy))
-    # 水平位置仍是对齐锚点，左右/居中各自使用画布内的可用宽度。
-    available_width = 2 * min(cx, width - cx) if align == 'center' else (cx if align == 'right' else width - cx)
-    mw = max(1, min(mw, available_width))
+
+    # 1. 主标题
+    # draw_text_wrapper 通常返回绘制结束后的 Y 坐标
     title = config.get('title', '')
-    subtitle = config.get('subtitle', '')
-    f_title, f_sub, gap = _fit_text_block(
-        ctx, title, subtitle, f_title, f_sub, mw, height - cy, int(config.get('gap_1', 30)))
     if title:
         cy = ctx.draw_text_wrapper(draw, title, cx, cy, f_title, mw, c_title, align=align)
-        cy += gap
-    if subtitle and cy < height:
+        # 间距
+        cy += int(config.get('gap_1', 30))
+
+    # 2. 副标题
+    subtitle = config.get('subtitle', '')
+    if subtitle:
         cy = ctx.draw_text_wrapper(draw, subtitle, cx, cy, f_sub, mw, c_sub, align=align)
-    
+
     return bg

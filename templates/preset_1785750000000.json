@@ -33,7 +33,7 @@
         "title_size": 150,
         "title_color": "#FFFFFF",
         "title_opacity": 255,
-        "title_y_offset": -20,
+        "title_y_offset": -80,
         "subtitle_size": 70,
         "subtitle_color": "#AAAAAA",
         "subtitle_opacity": 210,

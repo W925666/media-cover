@@ -7,43 +7,25 @@ import math
 # 1. 辅助函数 (无 Numpy)
 # =============================================================================
 
-def _fit_title_height(font, text, max_width, available_height):
-    while True:
-        lines = 0
-        for paragraph in str(text).splitlines() or [str(text)]:
-            current = ''
-            lines += 1
-            for char in paragraph:
-                if current and font.getlength(current + char) > max_width:
-                    lines += 1
-                    current = char
-                else:
-                    current += char
-        ascent, descent = font.getmetrics()
-        if lines * (ascent + descent + 10) <= available_height or font.size <= 1:
-            return font
-        font = font.font_variant(size=font.size - 1)
-
-
 def add_shadow(img, offset=(20, 20), shadow_color=(0, 0, 0, 200), blur_radius=20):
     """给图片添加阴影"""
     w, h = img.size
     shadow_w = w + abs(offset[0]) + blur_radius * 2
     shadow_h = h + abs(offset[1]) + blur_radius * 2
-    
+
     shadow = Image.new("RGBA", (shadow_w, shadow_h), (0,0,0,0))
     s_layer = Image.new("RGBA", (w, h), shadow_color)
-    
+
     # 放置阴影层
     paste_x = blur_radius + max(0, offset[0])
     paste_y = blur_radius + max(0, offset[1])
     shadow.paste(s_layer, (paste_x, paste_y))
     shadow = shadow.filter(ImageFilter.GaussianBlur(blur_radius))
-    
+
     # 放置原图
     img_x = blur_radius + max(0, -offset[0])
     img_y = blur_radius + max(0, -offset[1])
-    
+
     result = Image.new("RGBA", (shadow_w, shadow_h), (0,0,0,0))
     result.paste(shadow, (0,0))
     result.paste(img, (img_x, img_y), img)
@@ -55,17 +37,17 @@ def create_gradient_bg(size, color_left, color_right):
     # 创建 256x1 的渐变条
     gradient = Image.new('RGB', (256, 1))
     draw = ImageDraw.Draw(gradient)
-    
+
     r1, g1, b1 = color_left[:3]
     r2, g2, b2 = color_right[:3]
-    
+
     for i in range(256):
         ratio = i / 255.0
         r = int(r1 * (1 - ratio) + r2 * ratio)
         g = int(g1 * (1 - ratio) + g2 * ratio)
         b = int(b1 * (1 - ratio) + b2 * ratio)
         draw.point((i, 0), fill=(r, g, b))
-        
+
     return gradient.resize((w, h), Image.BICUBIC)
 
 def darken_color(color, factor=0.7):
@@ -132,7 +114,7 @@ def render(ctx, bg, config, assets, fonts):
     w, h = bg.size
     poster_urls = assets.get('posters', [])
     if not poster_urls: return bg
-    
+
     # --- 1. 背景生成 ---
     first_img = ctx.download_img(poster_urls[0])
     if first_img:
@@ -141,10 +123,10 @@ def render(ctx, bg, config, assets, fonts):
         theme_color = thumb.getpixel((0, 0))
     else:
         theme_color = (100, 100, 100)
-    
+
     color_left = darken_color(theme_color, 0.6)
     color_right = darken_color(theme_color, 1.2)
-    
+
     use_blur = config.get('use_blur_bg')
     if use_blur == True or use_blur == 'True' or str(use_blur) == '1':
         if first_img:
@@ -159,25 +141,25 @@ def render(ctx, bg, config, assets, fonts):
             bg = create_gradient_bg((w, h), color_left, color_right).convert("RGBA")
     else:
         bg = create_gradient_bg((w, h), color_left, color_right).convert("RGBA")
-        
+
     # --- 2. 海报墙生成 ---
     cell_w = int(config.get('cell_width', 410))
     cell_h = int(config.get('cell_height', 610))
     radius = int(config.get('corner_radius', 46))
     rotation = float(config.get('rotation', -16))
-    
+
     # 获取坐标配置
     start_x = int(config.get('start_x', 350))
     start_y = int(config.get('start_y', -200))
     # 使用 col_spacing 作为列与列之间的额外间距（除了海报宽度外的）
     col_gap = int(config.get('col_spacing', 50))
     margin_y = 22 # 图片垂直堆叠间距
-    
+
     # 定义行列数：3列 x 3行
     cols = 3
     rows = 3
     max_count = rows * cols
-    
+
     # [新增] 自动补全图片：如果图片不够9张，循环使用
     if len(poster_urls) < max_count:
         import itertools
@@ -185,14 +167,14 @@ def render(ctx, bg, config, assets, fonts):
         cycled_urls = itertools.cycle(poster_urls)
         # 取出 max_count 个
         poster_urls = [next(cycled_urls) for _ in range(max_count)]
-    
+
     # 按列处理：不同时常驻九张阴影海报与整列旋转副本。
-    
+
     # 制作圆角蒙版
     mask = Image.new("L", (cell_w, cell_h), 0)
     draw_mask = ImageDraw.Draw(mask)
     draw_mask.rounded_rectangle([(0,0), (cell_w, cell_h)], radius=radius, fill=255)
-    
+
     # --- 分列渲染核心逻辑 ---
     for col_idx in range(cols):
         col_imgs = []
@@ -209,37 +191,37 @@ def render(ctx, bg, config, assets, fonts):
             rgba.close()
             col_imgs.append(add_shadow(base, offset=(15, 15), blur_radius=15, shadow_color=(0, 0, 0, 180)))
             base.close()
-        
+
         if not col_imgs: continue
-        
+
         # 1. 拼合整列到一个临时长画布
         one_w, one_h = col_imgs[0].size
         # 计算总高度：图片高 * 数量 + 间距 * (数量-1)
-        total_h = one_h * len(col_imgs) + margin_y * (len(col_imgs)) 
-        
+        total_h = one_h * len(col_imgs) + margin_y * (len(col_imgs))
+
         col_canvas = Image.new("RGBA", (one_w, total_h), (0,0,0,0))
-        
+
         curr_y = 0
         for img in col_imgs:
             col_canvas.paste(img, (0, curr_y))
             # 这里的 -30 是为了消除部分阴影带来的视觉过大间距
-            curr_y += img.height - 30 
-            
+            curr_y += img.height - 30
+
         # 2. 旋转整列
         # expand=True 保证旋转后不被裁剪，但这会改变图层尺寸，需要重新计算中心
         rotated_col = col_canvas.rotate(rotation, resample=Image.BICUBIC, expand=True)
-        
+
         # 3. 计算放置位置
         # 逻辑：起始X + 列号 * (图片宽 - 叠加偏移 + 额外间距)
         # (cell_w - 50) 模仿了原代码的重叠紧凑感
         x_step = cell_w - 50 + col_gap
         col_base_x = start_x + col_idx * x_step
-        
+
         # 垂直错落感：每向右一列，Y轴稍微变化，造成一种倾斜墙面的视差
         # 这里设置为每列向上提一些 (例如 -80)，配合旋转角度
-        y_step = -80 
+        y_step = -80
         col_base_y = start_y + col_idx * y_step
-        
+
         # 绘制到背景
         bg.paste(rotated_col, (int(col_base_x), int(col_base_y)), rotated_col)
         rotated_col.close()
@@ -255,54 +237,32 @@ def render(ctx, bg, config, assets, fonts):
     draw = ImageDraw.Draw(bg)
     title = config.get('title', '')
     subtitle = config.get('subtitle', '')
-    
+
     f_title = fonts.get('font_title') or fonts.get('main')
     f_sub = fonts.get('font_sub') or fonts.get('sub')
-    
+
     t_size = int(config.get('title_size', 160))
     s_size = int(config.get('sub_size', 50))
-    
+
     tx = int(w * float(config.get('title_x', 5))/100)
     ty = int(h * float(config.get('title_y', 40))/100)
-    
-    # 同一文字列；竖条沿上游逻辑附着副标题，不再附着主标题。
-    tx = max(tx, round(w * 56 / 1920))
-    sx = tx
+
+    sx = int(w * float(config.get('sub_x', 8))/100)
     sy = int(h * float(config.get('sub_y', 58))/100)
-    
-    subtitle_width = max(1, min(int(w * 0.34) - sx, w - sx - 3))
-    gap = max(8, round(h * 0.018))
-    if subtitle:
-        f_sub = ctx.fit_single_line_font(f_sub, subtitle, subtitle_width)
-    reserve = (f_sub.getbbox(subtitle)[3] - f_sub.getbbox(subtitle)[1] + 2 * gap + 5) if subtitle else gap
-    minimum_title_height = 13 * max(1, len(str(title).splitlines()))
-    ty = max(0, min(ty, h - reserve - minimum_title_height))
-    f_title = _fit_title_height(f_title, title, w // 2, max(1, h - ty - reserve))
 
-    title_width = max(1, int(w * 0.34) - tx - 5)
-    f_title = ctx.fit_single_line_font(f_title, title, title_width)
-    
-    title_color = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
-    subtitle_color = ctx.resolve_text_fill(config, 'subtitle', '#FFFFFF')
+    # 颜色装饰块
+    random_color = get_random_bright_color() + (255,)
+    draw.rectangle([sx - 40, sy, sx - 20, sy + s_size * 2], fill=random_color)
+
+    text_color = (255, 255, 255, 255)
     shadow_color = (0, 0, 0, 100)
-    
-    title_bottom = ty
+
     if title:
-        ctx.draw_text_wrapper(draw, title, tx+5, ty+5, f_title, title_width, shadow_color)
-        title_bottom = ctx.draw_text_wrapper(draw, title, tx, ty, f_title, title_width, title_color)
+        ctx.draw_text_wrapper(draw, title, tx+5, ty+5, f_title, w//2, shadow_color)
+        ctx.draw_text_wrapper(draw, title, tx, ty, f_title, w//2, text_color)
 
     if subtitle:
-        sy = max(sy, title_bottom + gap - f_sub.getbbox(subtitle)[1]) if title else sy
-        sy = min(sy, h - f_sub.getbbox(subtitle)[3] - gap - 3)
-        scale = w / 1920.0
-        bar_width = max(1, round(20 * scale))
-        bar_gap = max(1, round(20 * scale))
-        ink = f_sub.getbbox(str(subtitle))
-        bar_top, bar_bottom = sy + ink[1], sy + ink[3]
-        draw.rectangle((sx - bar_gap - bar_width, bar_top,
-                        sx - bar_gap - 1, max(bar_top, bar_bottom - 1)),
-                       fill=get_random_bright_color() + (255,))
-        ctx.draw_text_wrapper(draw, subtitle, sx+3, sy+3, f_sub, subtitle_width, shadow_color)
-        ctx.draw_text_wrapper(draw, subtitle, sx, sy, f_sub, subtitle_width, subtitle_color)
-        
+        ctx.draw_text_wrapper(draw, subtitle, sx+3, sy+3, f_sub, w//3, shadow_color)
+        ctx.draw_text_wrapper(draw, subtitle, sx, sy, f_sub, w//3, text_color)
+
     return bg

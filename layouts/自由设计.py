@@ -225,28 +225,8 @@ def _element_image(ctx, element, assets, config):
         else:
             text = element.get("text", "自定义文字")
         font = _load_font(ctx, element.get("font"), element.get("fontSize", 96), text)
-        stroke_width = int(_number(element.get("strokeWidth"), 0, 0, 30))
-        if source == "subtitle" and text:
-            # 只适配副标题数据源；用户的独立元素位置、尺寸和自定义文字保持原设计。
-            available_width = max(1, width - 8 - stroke_width * 2)
-            for paragraph in str(text).splitlines():
-                font = ctx.fit_single_line_font(font, paragraph, available_width)
-            line_ratio = _number(element.get("lineHeight"), 1.15, 0.6, 3)
-            while getattr(font, 'size', 1) > 1:
-                boxes = [draw.textbbox((0, 0), line, font=font, stroke_width=stroke_width)
-                         for line in str(text).splitlines() or ['']]
-                step = max(int(line_ratio * font.size), max(box[3] - box[1] for box in boxes))
-                if max(box[2] - box[0] for box in boxes) <= width - 4 and step * len(boxes) <= height:
-                    break
-                font = font.font_variant(size=font.size - 1)
-            lines = str(text).splitlines() or ['']
-            line_height = max(int(line_ratio * getattr(font, 'size', 1)),
-                              max(draw.textbbox((0, 0), line, font=font, stroke_width=stroke_width)[3] -
-                                  draw.textbbox((0, 0), line, font=font, stroke_width=stroke_width)[1]
-                                  for line in lines))
-        else:
-            lines = _wrap_text(draw, text, font, max(10, width - 8))
-            line_height = int(_number(element.get("lineHeight"), 1.15, 0.6, 3) * int(_number(element.get("fontSize"), 96, 8, 500)))
+        lines = _wrap_text(draw, text, font, max(10, width - 8))
+        line_height = int(_number(element.get("lineHeight"), 1.15, 0.6, 3) * int(_number(element.get("fontSize"), 96, 8, 500)))
         total_height = max(line_height, len(lines) * line_height)
         vertical = element.get("verticalAlign", "center")
         if vertical == "bottom":
@@ -269,13 +249,7 @@ def _element_image(ctx, element, assets, config):
                 x = width - text_width - 2
             else:
                 x = 2
-            if source == "subtitle":
-                # bbox 原点补偿使描边也完整落在元素矩形内。
-                x -= bbox[0]
-                text_y = y - bbox[1]
-            else:
-                text_y = y
-            text_positions.append((x, text_y, line))
+            text_positions.append((x, y, line))
             y += line_height
         if element.get("colorMode", "solid") == "gradient":
             mask = Image.new("L", (width, height), 0)

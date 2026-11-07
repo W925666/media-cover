@@ -35,9 +35,9 @@ def create_shadow_and_reflection_group(img, reflection_opacity=40, shadow_blur=1
     w, h = img.size
     padding = 30
     total_w = w + padding * 2
-    total_h = h * 2 + padding 
+    total_h = h * 2 + padding
     group = Image.new('RGBA', (total_w, total_h), (0,0,0,0))
-    
+
     if shadow_blur > 0:
         shadow = Image.new('RGBA', (w + padding*2, h + padding*2), (0,0,0,0))
         sd = ImageDraw.Draw(shadow)
@@ -48,7 +48,7 @@ def create_shadow_and_reflection_group(img, reflection_opacity=40, shadow_blur=1
     if reflection_opacity > 0:
         ref = create_reflection(img, reflection_opacity)
         ref_x = padding
-        ref_y = padding + h 
+        ref_y = padding + h
         group.paste(ref, (ref_x, ref_y), mask=ref)
 
     group.paste(img, (padding, padding), mask=img)
@@ -98,7 +98,7 @@ def get_schema():
                 {"key": "title_size", "label": "主标题字号", "type": "range", "min": 20, "max": 200, "default": 90},
                 {"key": "title_color", "label": "主标题颜色", "type": "color", "default": "#FFFFFF"},
                 {"key": "title_offset_y", "label": "主标题垂直偏移", "type": "range", "min": -600, "max": 600, "default": -280},
-                
+
                 # 副标题
                 {"key": "font_subtitle", "label": "副标题字体", "type": "font", "default": "default.ttf"},
                 {"key": "subtitle_size", "label": "副标题字号", "type": "range", "min": 10, "max": 150, "default": 50},
@@ -114,14 +114,14 @@ def get_schema():
 
 def render(ctx, bg, config, assets, fonts):
     canvas_w, canvas_h = bg.size
-    
+
     # 1. 资源准备
     poster_urls = assets.get('posters', [])
     count = int(config.get('poster_count', 5))
     if not poster_urls: return bg
     while len(poster_urls) < count: poster_urls.extend(poster_urls)
     poster_urls = poster_urls[:count]
-    
+
     # 2. 动态背景
     mid_idx = count // 2
     hero_img_raw = ctx.download_img(poster_urls[mid_idx])
@@ -132,23 +132,20 @@ def render(ctx, bg, config, assets, fonts):
         bg = bg.filter(ImageFilter.GaussianBlur(blur_r))
         overlay = Image.new('RGBA', bg.size, (0, 0, 0, darkness))
         bg = Image.alpha_composite(bg.convert('RGBA'), overlay)
-        overlay.close()
-        hero_img_raw.close()
-        del overlay, hero_img_raw
     else:
         bg = Image.new('RGBA', (canvas_w, canvas_h), (30,30,30,255))
-        
+
     # 3. 几何参数
     fan_radius = int(config.get('fan_radius', 1200))
     fan_spread = int(config.get('fan_spread', 40))
     center_scale = float(config.get('center_scale', 0.55))
     shrink_ratio = float(config.get('side_scale_shrink', 0.95))
     y_offset = int(config.get('layout_y_offset', 100))
-    ref_op = 50 
-    
+    ref_op = 50
+
     base_h = int(canvas_h * center_scale)
     base_w = int(base_h * 0.666)
-    
+
     pivot_x = canvas_w // 2
     pivot_y = (canvas_h // 2) + fan_radius - (base_h // 2) + y_offset
 
@@ -156,22 +153,22 @@ def render(ctx, bg, config, assets, fonts):
         angle_step = fan_spread / (count - 1)
     else:
         angle_step = 0
-        
+
     render_list = []
-    
+
     for i in range(count):
         idx_offset = i - mid_idx
         theta_deg = idx_offset * angle_step
         theta_rad = math.radians(theta_deg)
-        
+
         pos_x = pivot_x + fan_radius * math.sin(theta_rad)
         pos_y = pivot_y - fan_radius * math.cos(theta_rad)
-        
+
         scale = math.pow(shrink_ratio, abs(idx_offset))
         w = int(base_w * scale)
         h = int(base_h * scale)
         z = -abs(idx_offset)
-        
+
         render_list.append({
             "url": poster_urls[i],
             "w": w,
@@ -188,62 +185,53 @@ def render(ctx, bg, config, assets, fonts):
     for item in render_list:
         img = ctx.download_img(item['url'])
         if not img: continue
-        
+
         img = img.resize((item['w'], item['h']), Image.LANCZOS)
         img = add_rounded_corners(img, 15)
-        
+
         s_blur = 20 if item['z'] == 0 else 10
         group, center_pt = create_shadow_and_reflection_group(img, ref_op, s_blur)
-        
+
         rotated_group = group.rotate(-item['angle'], resample=Image.BICUBIC, expand=True)
-        
+
         rw, rh = rotated_group.size
-        offset_y_fix = (item['h'] / 2) 
-        
+        offset_y_fix = (item['h'] / 2)
+
         paste_x = int(item['x'] - rw / 2)
-        paste_y = int(item['y'] - rh / 2 + offset_y_fix) 
+        paste_y = int(item['y'] - rh / 2 + offset_y_fix)
 
         bg.paste(rotated_group, (paste_x, paste_y), mask=rotated_group)
-        # 显式释放本张海报的倒影/阴影/旋转缓冲，下一张不叠加旧缓冲。
-        rotated_group.close()
-        group.close()
-        img.close()
-        del rotated_group, group, img
 
     # 5. 绘制文字 (使用新版标准逻辑)
     draw = ImageDraw.Draw(bg)
     title = config.get('title', '')
     subtitle = config.get('subtitle', '')
-    
+
     # 字体与颜色
     f_title = fonts.get('font_title') or fonts.get('main')
     f_sub = fonts.get('font_subtitle') or fonts.get('sub') or f_title
-    
+
     c_title = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
     c_sub = ctx.resolve_text_fill(config, 'subtitle', '#AAAAAA')
-    
-    def fit_block(font, text, available_height):
-        lines = str(text or '').splitlines() or ['']
-        font = ctx.fit_single_line_font(font, max(lines, key=font.getlength), max(1, canvas_w - 4))
-        def block_height():
-            ascent, descent = font.getmetrics()
-            return len(lines) * (ascent + descent + 10)
-        while font.size > 1 and block_height() > available_height:
-            font = font.font_variant(size=font.size - 1)
-        return font, block_height()
 
-    f_sub, sub_height = fit_block(f_sub, subtitle, canvas_h * 0.25)
-    gap = max(4, round(f_sub.size * 0.28))
-    reserve = sub_height + gap + 2 if subtitle else 2
-    text_y = max(0, min(canvas_h // 2 + int(config.get('title_offset_y', -280)), canvas_h - reserve - 13 * len(str(title or '').splitlines() or [''])))
-    f_title, _ = fit_block(f_title, title, canvas_h - text_y - reserve)
-    title_bottom = 0
+    # 绘制主标题
     if title:
-        title_bottom = ctx.draw_text_wrapper(draw, title, canvas_w // 2, text_y, f_title, canvas_w - 4, c_title, align='center')
+        # 使用独立的偏移量
+        offset_y = int(config.get('title_offset_y', -280))
+        text_y = (canvas_h // 2) + offset_y
 
+        # 居中绘制
+        ctx.draw_text_wrapper(draw, title, canvas_w // 2, text_y, f_title, canvas_w, c_title, align='center')
+
+    # 绘制副标题
     if subtitle:
-        configured_y = canvas_h // 2 + int(config.get('subtitle_offset_y', -200))
-        sub_y = max(0, min(configured_y, canvas_h - sub_height - 2), title_bottom + gap if title else 0)
-        ctx.draw_text_wrapper(draw, subtitle, canvas_w // 2, sub_y, f_sub, canvas_w - 4, c_sub, align='center')
+        # 使用独立的偏移量 (如果不设置，默认给一个相对位置)
+        sub_offset_y = int(config.get('subtitle_offset_y', -200))
+
+        # 如果用户没有特意去调副标题位置（还是默认值），我们可以做一个简单的智能判断
+        # 但为了参数逻辑清晰，这里完全遵从 sub_offset_y，即相对于画面中心
+        sub_y = (canvas_h // 2) + sub_offset_y
+
+        ctx.draw_text_wrapper(draw, subtitle, canvas_w // 2, sub_y, f_sub, canvas_w, c_sub, align='center')
 
     return bg

@@ -241,24 +241,6 @@ def _draw_cards(ctx, canvas, config, posters, progress=0.0):
     return Image.alpha_composite(canvas, stage)
 
 
-def _balanced_title_lines(title):
-    """长库名按视觉长度均衡拆成两行，短标题继续保持单行。"""
-    text = str(title or "").strip()
-    if not text:
-        return []
-    visual_length = sum(2 if ord(char) > 127 else 1 for char in text)
-    if visual_length <= 10:
-        return [text]
-    best_index = min(
-        range(1, len(text)),
-        key=lambda index: abs(
-            sum(2 if ord(char) > 127 else 1 for char in text[:index])
-            - sum(2 if ord(char) > 127 else 1 for char in text[index:])
-        ),
-    )
-    return [text[:best_index].strip(), text[best_index:].strip()]
-
-
 def _draw_text(ctx, canvas, config, fonts):
     width, height = canvas.size
     draw = ImageDraw.Draw(canvas)
@@ -267,76 +249,27 @@ def _draw_text(ctx, canvas, config, fonts):
     title = config.get("title", "")
     subtitle = config.get("subtitle", "")
     shadow_opacity = int(config.get("text_shadow_opacity", 100))
-    # 小尺寸 GIF 中书法字体的彩色笔画容易融入背景，增加轻量描边式阴影，
-    # 保持 FrameBase 构图不变但提高媒体库网格里的可读性。
-    shadow_dx = max(2, round(width / 180))
-    # 先按显式行缩字，防止引擎将英文逐字符折行；阴影复用同一字体。
-    def fit_block(font, text, max_width, available_height, spacing=10):
-        lines = str(text or '').splitlines() or ['']
-        font = ctx.fit_single_line_font(font, max(lines, key=font.getlength), max(1, max_width))
-        def block_height():
-            ascent, descent = font.getmetrics()
-            return len(lines) * (ascent + descent + spacing)
-        while font.size > 1 and block_height() > available_height:
-            font = font.font_variant(size=font.size - 1)
-        return font, block_height()
-
-    text_x = max(shadow_dx, min(int(width * float(config.get("title_pos_x", 6)) / 100), width - shadow_dx - 1))
-    sub_x = text_x
-    sub_width = max(1, min(int(width * float(config.get("sub_width_pct", 40)) / 100), width - sub_x - shadow_dx))
-    subtitle_font, sub_height = fit_block(subtitle_font, subtitle, sub_width, height * 0.25)
-    gap = max(shadow_dx + 2, round(subtitle_font.size * 0.28))
-    title_bottom = 0
     if title:
-        x = text_x
+        x = int(width * float(config.get("title_pos_x", 6)) / 100)
         y = int(height * float(config.get("title_pos_y", 38)) / 100)
         max_width = int(width * float(config.get("title_width_pct", 40)) / 100)
-        title_lines = str(title).splitlines() or [str(title)]
-        # 最多保留两行，避免异常超长名称持续向下侵占副标题区域。
-        if len(title_lines) > 2:
-            title_lines = [title_lines[0], " ".join(title_lines[1:])]
-        if len(title_lines) > 1:
-            # 两行标题从原中心向上下展开，避免向下挤压英文副标题。
-            try:
-                ascent, descent = title_font.getmetrics()
-                line_height = ascent + descent
-            except Exception:
-                bbox = title_font.getbbox("国Hg")
-                line_height = bbox[3] - bbox[1]
-            y -= round(line_height * 0.48)
-        x = max(shadow_dx, min(x, width - shadow_dx - 1))
-        max_width = max(1, min(max_width, width - x - shadow_dx))
-        title_text = '\n'.join(title_lines)
-        reserve = sub_height + gap + shadow_dx if subtitle else shadow_dx
-        y = max(shadow_dx, min(y, height - reserve - 4))
-        title_font, _ = fit_block(title_font, title_text, max_width, height - y - reserve, spacing=0)
-        line_height = sum(title_font.getmetrics())
-        title_fill = ctx.resolve_text_fill(
-            config, "title", "#FFFFFF", config.get("title_opacity", 255)
-        )
-        for line_index, title_line in enumerate(title_lines):
-            line_y = y + line_index * line_height if len(title_lines) > 1 else y
-            if shadow_opacity > 0:
-                for ox, oy in ((-shadow_dx, 0), (shadow_dx, 0), (0, -shadow_dx), (0, shadow_dx)):
-                    ctx.draw_text_wrapper(
-                        draw, title_line, x + ox, line_y + oy, title_font,
-                        max_width, (0, 0, 0, shadow_opacity), line_spacing=0,
-                    )
-            title_bottom = max(
-                title_bottom,
-                ctx.draw_text_wrapper(
-                    draw, title_line, x, line_y, title_font, max_width,
-                    title_fill, line_spacing=0,
-                ),
-            )
-    if subtitle:
-        x = sub_x
-        configured_y = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
-        # 先限制配置坐标，再应用标题后 Y 下限，避免回钳导致重叠。
-        y = max(0, min(configured_y, height - sub_height - shadow_dx), title_bottom + gap if title else 0)
-        max_width = sub_width
         if shadow_opacity > 0:
-            ctx.draw_text_wrapper(draw, subtitle, x + shadow_dx, y + shadow_dx, subtitle_font, max_width, (0, 0, 0, shadow_opacity))
+            ctx.draw_text_wrapper(draw, title, x + 3, y + 3, title_font, max_width, (0, 0, 0, shadow_opacity))
+        ctx.draw_text_wrapper(
+            draw,
+            title,
+            x,
+            y,
+            title_font,
+            max_width,
+            ctx.resolve_text_fill(config, "title", "#FFFFFF", config.get("title_opacity", 255)),
+        )
+    if subtitle:
+        x = int(width * float(config.get("subtitle_pos_x", 6)) / 100)
+        y = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
+        max_width = int(width * float(config.get("sub_width_pct", 40)) / 100)
+        if shadow_opacity > 0:
+            ctx.draw_text_wrapper(draw, subtitle, x + 2, y + 2, subtitle_font, max_width, (0, 0, 0, shadow_opacity))
         ctx.draw_text_wrapper(
             draw,
             subtitle,

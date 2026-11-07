@@ -26,7 +26,7 @@ def main():
                     if 'key' in field and 'default' in field:
                         config[field['key']] = field['default']
         for long in (False, True):
-            config.update(title='糖心Vlog\n&玩偶姐姐' if long else '欧美剧',
+            config.update(title='糖心Vlog&玩偶姐姐' if long else '欧美剧',
                           subtitle='WESTERN TELEVISION SERIES COLLECTION' if long else 'WESTERN TV SERIES',
                           frame_index=0, frame_progress=0.0, enable_animation=False)
             fonts = {'main': engine._load_text_font('OPPOSans-B.ttf', int(config.get('title_size',160)),config['title']),
@@ -47,9 +47,8 @@ def main():
                 engine.draw_text_wrapper = original
             title_calls = [c for c in calls if c[0] in config['title'].splitlines() or c[0] == config['title']]
             subtitle_calls = [c for c in calls if c[0] == config['subtitle']]
-            if title_calls and subtitle_calls:
-                # 最后一遍为正文，前面的阴影坐标有刻意偏移。
-                assert title_calls[-1][1:3] == subtitle_calls[-1][1:3], (name, title_calls[-1][:3], subtitle_calls[-1][:3])
+            # 原版各布局允许独立锚点；不再强制同列，原版一致性由
+            # test_original_layouts.py 的像素对比覆盖。
             assert result.size==(1920,1080), (name,result.size)
             result.convert('RGB').save(output/(name+('-long' if long else '-short')+'.jpg'))
             result.close()

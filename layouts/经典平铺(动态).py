@@ -1,34 +1,6 @@
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 
 
-def _fit_text_block(ctx, title, subtitle, title_font, subtitle_font, width, height, gap):
-    width, height = max(1, width), max(1, height)
-    for text, is_sub in ((title, False), (subtitle, True)):
-        font = subtitle_font if is_sub else title_font
-        if text and (is_sub or str(text).isascii()):
-            for line in str(text).splitlines():
-                font = ctx.fit_single_line_font(font, line, width)
-        if is_sub:
-            subtitle_font = font
-        else:
-            title_font = font
-    def text_height(text, font):
-        class Measure:
-            def text(self, *args, **kwargs):
-                pass
-        return ctx.draw_text_wrapper(Measure(), text, 0, 0, font, width, '#FFFFFF') if text else 0
-    gap = max(0, gap) if title and subtitle else 0
-    while text_height(title, title_font) + gap + text_height(subtitle, subtitle_font) > height:
-        if not any(text and getattr(font, 'size', 1) > 1 for text, font in ((title, title_font), (subtitle, subtitle_font))):
-            gap = 0
-            break
-        if title and getattr(title_font, 'size', 1) > 1:
-            title_font = title_font.font_variant(size=title_font.size - 1)
-        if subtitle and getattr(subtitle_font, 'size', 1) > 1:
-            subtitle_font = subtitle_font.font_variant(size=subtitle_font.size - 1)
-    return title_font, subtitle_font, gap
-
-
 def add_rounded_corners(image, radius):
     image = image.convert("RGBA")
     if radius <= 0:
@@ -226,17 +198,12 @@ def _draw_overlay_and_text(ctx, canvas, config, fonts):
     title_fill = ctx.resolve_text_fill(config, "title", "#FFFFFF", config.get("title_opacity", 255))
     subtitle_fill = ctx.resolve_text_fill(config, "subtitle", "#DDDDDD", config.get("subtitle_opacity", 210))
 
-    x = max(0, min(width - 1, x))
-    y = max(0, min(height - 1, y))
-    max_width = max(1, min(max_width, width - x))
     title = config.get("title", "")
-    subtitle = config.get("subtitle", "")
-    title_font, subtitle_font, gap = _fit_text_block(
-        ctx, title, subtitle, title_font, subtitle_font, max_width, height - y, int(config.get("text_gap", 20)))
     if title:
         y = ctx.draw_text_wrapper(draw, title, x, y, title_font, max_width, title_fill)
-        y += gap
-    if subtitle and y < height:
+        y += int(config.get("text_gap", 20))
+    subtitle = config.get("subtitle", "")
+    if subtitle:
         ctx.draw_text_wrapper(draw, subtitle, x, y, subtitle_font, max_width, subtitle_fill)
     return canvas
 

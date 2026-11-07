@@ -29,13 +29,13 @@ def adjust_color_macaron(color):
     h, s, v = rgb_to_hsv(color)
     target_saturation_range = (0.3, 0.7)
     target_value_range = (0.6, 0.85)
-    
+
     if s < target_saturation_range[0]: s = target_saturation_range[0]
     elif s > target_saturation_range[1]: s = target_saturation_range[1]
-    
+
     if v < target_value_range[0]: v = target_value_range[0]
     elif v > target_value_range[1]: v = target_value_range[1]
-    
+
     return hsv_to_rgb(h, s, v)
 
 def color_distance(color1, color2):
@@ -49,22 +49,22 @@ def find_dominant_macaron_colors(image, num_colors=5):
     img.thumbnail((150, 150))
     img = img.convert('RGB')
     pixels = list(img.getdata())
-    
+
     filtered_pixels = [p for p in pixels if is_not_black_white_gray_near(p)]
     if not filtered_pixels: return []
-    
+
     color_counter = Counter(filtered_pixels)
     candidate_colors = color_counter.most_common(num_colors * 5)
-    
+
     macaron_colors = []
     min_color_distance = 0.15
-    
+
     for color, _ in candidate_colors:
         adjusted_color = adjust_color_macaron(color)
         if not any(color_distance(adjusted_color, existing) < min_color_distance for existing in macaron_colors):
             macaron_colors.append(adjusted_color)
             if len(macaron_colors) >= num_colors: break
-    
+
     return macaron_colors
 
 def darken_color(color, factor=0.7):
@@ -86,7 +86,7 @@ def get_rgba_color(hex_color, default_color, opacity=255):
 def add_film_grain(image, intensity=0.05):
     if intensity <= 0: return image
     w, h = image.size
-    sigma = intensity * 255 * 2 
+    sigma = intensity * 255 * 2
     noise = Image.effect_noise((w, h), sigma)
     return Image.blend(image.convert('RGB'), noise.convert('RGB'), intensity * 0.5).convert('RGBA')
 
@@ -116,28 +116,28 @@ def add_shadow_and_rotate(canvas, img, angle, offset=(10, 10), radius=10, opacit
     width, height = img.size
     if center_pos is None:
         center_pos = (canvas.width // 2, canvas.height // 2)
-    
+
     padding = max(radius * 4, 100)
     shadow_size = (width + padding * 2, height + padding * 2)
     shadow = Image.new("RGBA", shadow_size, (0, 0, 0, 0))
-    
+
     shadow_mask = Image.new("L", (width, height), 255)
     if img.mode == "RGBA":
         shadow_mask = img.split()[3]
-    
+
     shadow.paste((0, 0, 0, int(255 * opacity)), (padding, padding), shadow_mask)
     shadow = shadow.filter(ImageFilter.GaussianBlur(radius))
-    
+
     rotated_shadow = rotate_image(shadow, angle)
     s_w, s_h = rotated_shadow.size
     shadow_x = center_pos[0] - s_w // 2 + offset[0]
     shadow_y = center_pos[1] - s_h // 2 + offset[1]
-    
+
     rotated_img = rotate_image(img, angle)
     i_w, i_h = rotated_img.size
     img_x = center_pos[0] - i_w // 2
     img_y = center_pos[1] - i_h // 2
-    
+
     canvas.paste(rotated_shadow, (shadow_x, shadow_y), rotated_shadow)
     canvas.paste(rotated_img, (img_x, img_y), rotated_img)
     return canvas
@@ -212,149 +212,121 @@ def get_schema():
 # =============================================================================
 # 3. 渲染逻辑
 # =============================================================================
-def _fit_text_block(ctx, font, text, max_width, max_height, line_spacing=10):
-    """保留显式换行；每行缩字适配，避免英文被引擎逐字符折行。"""
-    lines = str(text or '').splitlines() or ['']
-    longest = max(lines, key=lambda line: font.getlength(line))
-    font = ctx.fit_single_line_font(font, longest, max(1, max_width))
-    def block_height():
-        try:
-            ascent, descent = font.getmetrics()
-            return len(lines) * (ascent + descent + line_spacing)
-        except AttributeError:
-            box = font.getbbox('Hg')
-            return len(lines) * (box[3] - box[1] + line_spacing)
-    while getattr(font, 'size', 1) > 1 and block_height() > max_height:
-        font = font.font_variant(size=font.size - 1)
-    return font, block_height()
-
-
 def render(ctx, bg, config, assets, fonts):
     poster_urls = assets.get('posters', [])
     if not poster_urls: return bg
-    
+
     # 下载主图
     original_img = ctx.download_img(poster_urls[0])
     if not original_img: return bg
     original_img = original_img.convert("RGB")
-    
+
     width, height = bg.size
-    
+
     # --- 1. 颜色与背景 ---
     num_colors = 6
     extracted_colors = find_dominant_macaron_colors(original_img, num_colors=num_colors)
     soft_macaron_colors = [(237, 159, 77), (186, 225, 255), (255, 223, 186), (202, 231, 200)]
     while len(extracted_colors) < num_colors:
         extracted_colors.append(random.choice(soft_macaron_colors))
-            
+
     auto_bg_color = darken_color(extracted_colors[0], 0.85)
     auto_card_color1 = extracted_colors[1]
     auto_card_color2 = extracted_colors[2]
-    
+
     blur_radius = int(config.get('bg_blur', 60))
     color_ratio = float(config.get('color_ratio', 0.85))
     grain_val = float(config.get('grain_intensity', 0.05))
-    
+
     bg_img = original_img.copy()
     bg_img = ImageOps.fit(bg_img, (width, height), method=Image.LANCZOS)
     bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=blur_radius))
-    
+
     solid_bg = Image.new("RGB", (width, height), auto_bg_color)
     blended_bg = Image.blend(bg_img, solid_bg, color_ratio)
     bg = add_film_grain(blended_bg, intensity=grain_val).convert("RGBA")
-    
+
     # --- 2. 绘制卡片 ---
     square_img = crop_to_square(original_img)
     card_scale = float(config.get('card_scale', 0.65))
     card_size = int(height * card_scale)
     card_radius = int(config.get('card_radius', 40))
-    
+
     square_img = square_img.resize((card_size, card_size), Image.LANCZOS)
-    
+
     # 顶层 (原图)
     main_card = add_rounded_corners(square_img, radius=card_radius).convert("RGBA")
-    
+
     # 中间层
     aux_card1 = square_img.copy().filter(ImageFilter.GaussianBlur(radius=8))
     solid_card1 = Image.new("RGB", aux_card1.size, auto_card_color1)
     aux_card1 = Image.blend(aux_card1, solid_card1, 0.5)
     aux_card1 = add_rounded_corners(aux_card1, radius=card_radius).convert("RGBA")
-    
+
     # 底层
     aux_card2 = square_img.copy().filter(ImageFilter.GaussianBlur(radius=16))
     solid_card2 = Image.new("RGB", aux_card2.size, auto_card_color2)
     aux_card2 = Image.blend(aux_card2, solid_card2, 0.6)
     aux_card2 = add_rounded_corners(aux_card2, radius=card_radius).convert("RGBA")
-    
+
     cards_canvas = Image.new("RGBA", (width, height), (0,0,0,0))
     cx = int(width * (float(config.get('card_x_percent', 68)) / 100))
     cy = int(height * (float(config.get('card_y_percent', 50)) / 100))
     center_pos = (cx, cy)
-    
+
     angles = [
         int(config.get('angle_bot', 24)),
         int(config.get('angle_mid', 12)),
         int(config.get('angle_top', 0))
     ]
-    
+
     s_opacity = float(config.get('shadow_opacity', 0.5))
     s_blur = int(config.get('shadow_blur', 20))
     s_off_x = int(config.get('shadow_offset_x', 15))
     s_off_y = int(config.get('shadow_offset_y', 20))
-    
+
     cards_list = [aux_card2, aux_card1, main_card]
     for i, (card, angle) in enumerate(zip(cards_list, angles)):
         cards_canvas = add_shadow_and_rotate(
-            cards_canvas, card, angle, 
-            offset=(s_off_x, s_off_y), 
-            radius=s_blur, 
+            cards_canvas, card, angle,
+            offset=(s_off_x, s_off_y),
+            radius=s_blur,
             opacity=s_opacity,
             center_pos=center_pos
         )
     bg = Image.alpha_composite(bg, cards_canvas)
-    
+
     # --- 3. 绘制文字 (独立坐标) ---
     draw = ImageDraw.Draw(bg)
-    
+
     title_str = config.get('title', '')
     subtitle_str = config.get('subtitle', '')
-    
+
     f_title_path = fonts.get('font_title') or fonts.get('main')
     f_sub_path = fonts.get('font_subtitle') or fonts.get('sub') or f_title_path
-    
+
     # 颜色
     t_color = ctx.resolve_text_fill(config, 'title', '#FFFFFF', 255)
     s_color = ctx.resolve_text_fill(config, 'subtitle', '#FFFFFF', 200)
     shadow_op = int(config.get('text_shadow_opacity', 100))
     shadow_color = (0, 0, 0, shadow_op)
-    
+
     # 主标题坐标
     tx = int(width * (float(config.get('title_pos_x', 15)) / 100))
     ty = int(height * (float(config.get('title_pos_y', 42)) / 100))
     mw_title = int(width * (float(config.get('title_width_pct', 40)) / 100))
-    
+
     # 副标题坐标 (独立)
     sx = int(width * (float(config.get('subtitle_pos_x', 15)) / 100))
     sy = int(height * (float(config.get('subtitle_pos_y', 55)) / 100))
     mw_sub = int(width * (float(config.get('sub_width_pct', 40)) / 100))
-    
-    tx = max(0, min(tx, width - 4))
-    sx = tx  # 主副标题共享同一列，预设遗留 subtitle_pos_x 不再造成偏移。
-    mw_title = max(1, min(mw_title, width - tx - 3))
-    mw_sub = max(1, min(mw_sub, width - sx - 2))
-    f_sub_path, sub_height = _fit_text_block(ctx, f_sub_path, subtitle_str, mw_sub, height * 0.25)
-    gap = max(4, round(getattr(f_sub_path, 'size', 1) * 0.28))
-    reserve = sub_height + gap + 3 if subtitle_str else 3
-    ty = max(0, min(ty, height - reserve - 13 * len(str(title_str or '').splitlines() or [''])))
-    f_title_path, _ = _fit_text_block(ctx, f_title_path, title_str, mw_title, height - ty - reserve)
-    title_bottom = 0
+
     if title_str:
         if shadow_op > 0:
             ctx.draw_text_wrapper(draw, title_str, tx + 3, ty + 3, f_title_path, mw_title, shadow_color)
-        title_bottom = ctx.draw_text_wrapper(draw, title_str, tx, ty, f_title_path, mw_title, t_color)
+        ctx.draw_text_wrapper(draw, title_str, tx, ty, f_title_path, mw_title, t_color)
 
     if subtitle_str:
-        sy = max(min(sy, height - sub_height - 2), title_bottom + gap if title_str else 0)
         if shadow_op > 0:
             ctx.draw_text_wrapper(draw, subtitle_str, sx + 2, sy + 2, f_sub_path, mw_sub, shadow_color)
         ctx.draw_text_wrapper(draw, subtitle_str, sx, sy, f_sub_path, mw_sub, s_color)

@@ -40,10 +40,10 @@ def find_dominant_vibrant_colors(image, num_colors=5):
     pixels = list(img.getdata())
     filtered_pixels = [p for p in pixels if is_not_black_white_gray_near(p)]
     if not filtered_pixels: return []
-    
+
     color_counter = Counter(filtered_pixels)
     dominant_colors = color_counter.most_common(num_colors * 3)
-    
+
     macaron_colors = []
     for color, _ in dominant_colors:
         h, s, v = rgb_to_hsv(color)
@@ -79,11 +79,11 @@ def align_image_right(img, canvas_size):
     cw, ch = canvas_size
     target_width = int(cw * 0.675)
     iw, ih = img.size
-    
+
     scale = ch / ih
     new_w = int(iw * scale)
     resized = img.resize((new_w, ch), Image.LANCZOS)
-    
+
     if new_w < target_width:
         # 如果缩放后宽度不足，按宽度缩放
         scale = target_width / iw
@@ -104,7 +104,7 @@ def align_image_right(img, canvas_size):
         # 放置位置
         paste_x = cw - target_width + int(cw * 0.075)
         final.paste(cropped, (paste_x, 0))
-        
+
     return final
 
 def create_diagonal_mask(size, split_top=0.55, split_bottom=0.4):
@@ -194,48 +194,48 @@ def render(ctx, bg, config, assets, fonts):
     img_raw = ctx.download_img(backdrop_urls[0])
     if not img_raw: return bg
     img_raw = img_raw.convert("RGB")
-    
+
     w, h = bg.size
-    
+
     # 2. 智能取色
     vibrant_colors = find_dominant_vibrant_colors(img_raw)
     if vibrant_colors:
         theme_color = vibrant_colors[0]
     else:
         theme_color = (237, 159, 77) # 默认橙
-        
+
     # 3. 处理前景图 (右侧)
     fg_img = align_image_right(img_raw, (w, h)).convert("RGBA")
-    
+
     # 4. 处理背景图 (左侧)
     blur_r = int(config.get('bg_blur', 50))
     color_ratio = float(config.get('color_ratio', 0.9))
     grain = float(config.get('grain_val', 0.05))
-    
+
     bg_base = img_raw.copy()
     bg_base = ImageOps.fit(bg_base, (w, h), method=Image.LANCZOS)
     bg_base = bg_base.filter(ImageFilter.GaussianBlur(blur_r))
-    
+
     # 混合颜色 (不使用 numpy)
     bg_theme = darken_color(theme_color, 0.85)
     solid_layer = Image.new("RGB", (w, h), bg_theme)
     blended_bg = Image.blend(bg_base, solid_layer, color_ratio)
     blended_bg = add_film_grain(blended_bg, grain).convert("RGBA")
-    
+
     # 5. 蒙版合成
     split_top = float(config.get('split_top', 55)) / 100
     split_bot = float(config.get('split_bottom', 40)) / 100
     feather = int(config.get('shadow_feather', 30))
-    
+
     # 斜线蒙版 (左白右黑) -> 注意：这里蒙版用在 blend 时，alpha=0显示第一张图(bg)，alpha=255显示第二张图(fg)
     # create_diagonal_mask 返回的是：左侧255(白)，右侧0(黑)
     # 我们希望：左侧显示背景，右侧显示前景
     diag_mask = create_diagonal_mask((w, h), split_top, split_bot)
-    
+
     # 阴影层
     shadow_mask = create_shadow_mask((w, h), split_top, split_bot, feather)
     shadow_layer = Image.new("RGBA", (w, h), darken_color(bg_theme, 0.5))
-    
+
     # 组合: 先把前景画在画布上
     final_canvas = fg_img.copy()
     # 加上阴影条
@@ -243,59 +243,41 @@ def render(ctx, bg, config, assets, fonts):
     # 用斜线蒙版把左侧替换成背景
     # composite(image1, image2, mask): mask为255时取image1
     final_canvas = Image.composite(blended_bg, final_canvas, diag_mask)
-    
+
     bg = final_canvas # 赋值给最终输出
-    
+
     # 6. 绘制文字 (独立坐标)
     draw = ImageDraw.Draw(bg)
     title = config.get('title', '')
     sub = config.get('subtitle', '')
-    
+
     f_title = fonts.get('font_title') or fonts.get('main')
     f_sub = fonts.get('font_subtitle') or fonts.get('sub') or f_title
-    
+
     # 字体颜色 (带透明度)
     c_title = ctx.resolve_text_fill(config, 'title', '#FFFFFF', 229)
     c_sub = ctx.resolve_text_fill(config, 'subtitle', '#FFFFFF', 229)
     c_shadow = darken_color(bg_theme, 0.8) + (75,)
-    
+
     # 坐标与宽度
     tx = int(w * float(config.get('title_x', 25)) / 100)
     ty = int(h * float(config.get('title_y', 40)) / 100)
     tw = int(w * float(config.get('title_width_pct', 40)) / 100)
-    
+
     sx = int(w * float(config.get('sub_x', 25)) / 100)
     sy = int(h * float(config.get('sub_y', 60)) / 100)
     sw = int(w * float(config.get('sub_width_pct', 40)) / 100)
-    
-    # 居中锚点两侧都为阴影留边；显式换行保留，其余行先缩字。
-    tx = max(12, min(tx, w - 12))
-    sx = tx  # 保留上游居中构图，主副标题共用中心轴。
-    tw = max(1, min(tw, 2 * min(tx, w - tx - 11)))
-    sw = max(1, min(sw, 2 * min(sx, w - sx - 6)))
-    def fit_block(font, text, max_width, available_height):
-        lines = str(text or '').splitlines() or ['']
-        font = ctx.fit_single_line_font(font, max(lines, key=font.getlength), max_width)
-        def block_height():
-            ascent, descent = font.getmetrics()
-            return len(lines) * (ascent + descent + 10)
-        while font.size > 1 and block_height() > available_height:
-            font = font.font_variant(size=font.size - 1)
-        return font, block_height()
 
-    f_sub, sub_height = fit_block(f_sub, sub, sw, h * 0.25)
-    gap = max(12, round(f_sub.size * 0.28))
-    reserve = sub_height + gap + 7 if sub else 12
-    ty = max(0, min(ty, h - reserve - 13 * len(str(title or '').splitlines() or [''])))
-    f_title, _ = fit_block(f_title, title, tw, h - ty - reserve)
-    title_bottom = 0
+    # 绘制主标题
     if title:
+        # 阴影 (手动绘制多次以模拟柔和阴影)
         for off in range(3, 13, 2):
-            ctx.draw_text_wrapper(draw, title, tx+off, ty+off, f_title, tw, c_shadow, align='center')
-        title_bottom = ctx.draw_text_wrapper(draw, title, tx, ty, f_title, tw, c_title, align='center')
+             ctx.draw_text_wrapper(draw, title, tx+off, ty+off, f_title, tw, c_shadow, align='center')
+        # 正文 (注意：draw_text_wrapper默认可能垂直居中或顶部对齐，这里假设它接受的是(x,y))
+        ctx.draw_text_wrapper(draw, title, tx, ty, f_title, tw, c_title, align='center')
 
+    # 绘制副标题
     if sub:
-        sy = max(0, min(sy, h - sub_height - 6), title_bottom + gap if title else 0)
         for off in range(2, 8, 2):
             ctx.draw_text_wrapper(draw, sub, sx+off, sy+off, f_sub, sw, c_shadow, align='center')
         ctx.draw_text_wrapper(draw, sub, sx, sy, f_sub, sw, c_sub, align='center')
