@@ -185,6 +185,24 @@ def _draw_focus_stage(ctx, canvas, config, pairs, active_index):
     return canvas
 
 
+def _fit_title_height(font, text, max_width, available_height):
+    while True:
+        lines = 0
+        for paragraph in str(text).splitlines() or [str(text)]:
+            current = ''
+            lines += 1
+            for char in paragraph:
+                if current and font.getlength(current + char) > max_width:
+                    lines += 1
+                    current = char
+                else:
+                    current += char
+        ascent, descent = font.getmetrics()
+        if lines * (ascent + descent + 10) <= available_height or font.size <= 1:
+            return font
+        font = font.font_variant(size=font.size - 1)
+
+
 def _draw_text(ctx, canvas, config, fonts):
     width, height = canvas.size
     hero_height = int(height * (float(config.get("hero_height_percent", 51)) / 100))
@@ -197,13 +215,22 @@ def _draw_text(ctx, canvas, config, fonts):
     draw = ImageDraw.Draw(canvas)
 
     title = config.get("title", "")
+    title_bottom = max(0, base_y + int(config.get("title_y_offset", -80)))
+    subtitle = config.get("subtitle", "")
+    if subtitle:
+        subtitle_font = ctx.fit_single_line_font(subtitle_font, subtitle, max_width)
+    gap = max(4, round(height * 0.018))
+    reserve = (subtitle_font.getbbox(subtitle)[3] - subtitle_font.getbbox(subtitle)[1] + 2 * gap) if subtitle else gap
+    minimum_title_height = 13 * max(1, len(str(title).splitlines()))
+    title_bottom = max(0, min(title_bottom, height - reserve - minimum_title_height))
+    title_font = _fit_title_height(title_font, title, max_width, max(1, height - title_bottom - reserve))
     if title:
         title_fill = ctx.resolve_text_fill(config, "title", "#FFFFFF", config.get("title_opacity", 255))
-        ctx.draw_text_wrapper(
+        title_bottom = ctx.draw_text_wrapper(
             draw,
             title,
             center_x,
-            base_y + int(config.get("title_y_offset", -80)),
+            title_bottom,
             title_font,
             max_width,
             title_fill,
@@ -218,6 +245,11 @@ def _draw_text(ctx, canvas, config, fonts):
             + int(config.get("title_size", 150))
             + int(config.get("subtitle_offset_y", 20))
         )
+        subtitle_font = ctx.fit_single_line_font(subtitle_font, subtitle, max_width)
+        gap = max(4, round(height * 0.018))
+        if title:
+            subtitle_y = max(subtitle_y, title_bottom + gap - subtitle_font.getbbox(subtitle)[1])
+        subtitle_y = min(subtitle_y, height - subtitle_font.getbbox(subtitle)[3] - gap)
         ctx.draw_text_wrapper(
             draw,
             subtitle,

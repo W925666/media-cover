@@ -268,16 +268,33 @@ def render(ctx, bg, config, assets, fonts):
     sy = int(h * float(config.get('sub_y', 60)) / 100)
     sw = int(w * float(config.get('sub_width_pct', 40)) / 100)
     
-    # 绘制主标题
+    # 居中锚点两侧都为阴影留边；显式换行保留，其余行先缩字。
+    tx, sx = max(12, min(tx, w - 12)), max(7, min(sx, w - 7))
+    tw = max(1, min(tw, 2 * min(tx, w - tx - 11)))
+    sw = max(1, min(sw, 2 * min(sx, w - sx - 6)))
+    def fit_block(font, text, max_width, available_height):
+        lines = str(text or '').splitlines() or ['']
+        font = ctx.fit_single_line_font(font, max(lines, key=font.getlength), max_width)
+        def block_height():
+            ascent, descent = font.getmetrics()
+            return len(lines) * (ascent + descent + 10)
+        while font.size > 1 and block_height() > available_height:
+            font = font.font_variant(size=font.size - 1)
+        return font, block_height()
+
+    f_sub, sub_height = fit_block(f_sub, sub, sw, h * 0.25)
+    gap = max(12, round(f_sub.size * 0.28))
+    reserve = sub_height + gap + 7 if sub else 12
+    ty = max(0, min(ty, h - reserve - 13 * len(str(title or '').splitlines() or [''])))
+    f_title, _ = fit_block(f_title, title, tw, h - ty - reserve)
+    title_bottom = 0
     if title:
-        # 阴影 (手动绘制多次以模拟柔和阴影)
         for off in range(3, 13, 2):
-             ctx.draw_text_wrapper(draw, title, tx+off, ty+off, f_title, tw, c_shadow, align='center')
-        # 正文 (注意：draw_text_wrapper默认可能垂直居中或顶部对齐，这里假设它接受的是(x,y))
-        ctx.draw_text_wrapper(draw, title, tx, ty, f_title, tw, c_title, align='center')
-        
-    # 绘制副标题
+            ctx.draw_text_wrapper(draw, title, tx+off, ty+off, f_title, tw, c_shadow, align='center')
+        title_bottom = ctx.draw_text_wrapper(draw, title, tx, ty, f_title, tw, c_title, align='center')
+
     if sub:
+        sy = max(0, min(sy, h - sub_height - 6), title_bottom + gap if title else 0)
         for off in range(2, 8, 2):
             ctx.draw_text_wrapper(draw, sub, sx+off, sy+off, f_sub, sw, c_shadow, align='center')
         ctx.draw_text_wrapper(draw, sub, sx, sy, f_sub, sw, c_sub, align='center')

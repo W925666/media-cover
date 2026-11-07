@@ -7,6 +7,24 @@ import math
 # 1. 辅助函数 (无 Numpy)
 # =============================================================================
 
+def _fit_title_height(font, text, max_width, available_height):
+    while True:
+        lines = 0
+        for paragraph in str(text).splitlines() or [str(text)]:
+            current = ''
+            lines += 1
+            for char in paragraph:
+                if current and font.getlength(current + char) > max_width:
+                    lines += 1
+                    current = char
+                else:
+                    current += char
+        ascent, descent = font.getmetrics()
+        if lines * (ascent + descent + 10) <= available_height or font.size <= 1:
+            return font
+        font = font.font_variant(size=font.size - 1)
+
+
 def add_shadow(img, offset=(20, 20), shadow_color=(0, 0, 0, 200), blur_radius=20):
     """给图片添加阴影"""
     w, h = img.size
@@ -254,6 +272,15 @@ def render(ctx, bg, config, assets, fonts):
     sx = int(w * float(config.get('sub_x', 8))/100)
     sy = int(h * float(config.get('sub_y', 58))/100)
     
+    subtitle_width = max(1, min(int(w * 0.34) - sx, w - sx - 3))
+    gap = max(8, round(h * 0.018))
+    if subtitle:
+        f_sub = ctx.fit_single_line_font(f_sub, subtitle, subtitle_width)
+    reserve = (f_sub.getbbox(subtitle)[3] - f_sub.getbbox(subtitle)[1] + 2 * gap + 5) if subtitle else gap
+    minimum_title_height = 13 * max(1, len(str(title).splitlines()))
+    ty = max(0, min(ty, h - reserve - minimum_title_height))
+    f_title = _fit_title_height(f_title, title, w // 2, max(1, h - ty - reserve))
+
     # 颜色装饰块属于中文主标题，放在主标题左侧并保留安全边距。
     random_color = get_random_bright_color() + (255,)
     bar_gap = 20
@@ -261,6 +288,8 @@ def render(ctx, bg, config, assets, fonts):
     bar_height = max(60, int(t_size * 0.65))
     tx = max(tx, 16 + bar_width + bar_gap)
     bar_right = tx - bar_gap
+    title_width = max(1, int(w * 0.34) - tx - 5)
+    f_title = ctx.fit_single_line_font(f_title, title, title_width)
     # Pillow 的 y 是字体起点，汉字墨迹顶部通常在 y 以下几十像素。
     title_bbox = draw.multiline_textbbox((tx, ty), str(title), font=f_title)
     bar_top = int(title_bbox[1])
@@ -275,14 +304,12 @@ def render(ctx, bg, config, assets, fonts):
     
     title_bottom = ty
     if title:
-        ctx.draw_text_wrapper(draw, title, tx+5, ty+5, f_title, w//2, shadow_color)
-        title_bottom = ctx.draw_text_wrapper(draw, title, tx, ty, f_title, w//2, title_color)
+        ctx.draw_text_wrapper(draw, title, tx+5, ty+5, f_title, title_width, shadow_color)
+        title_bottom = ctx.draw_text_wrapper(draw, title, tx, ty, f_title, title_width, title_color)
 
     if subtitle:
-        subtitle_width = max(1, int(w * 0.34) - sx)
-        f_sub = ctx.fit_single_line_font(f_sub, subtitle, max(1, subtitle_width))
-        gap = max(8, round(h * 0.018))
-        sy = max(sy, title_bottom + gap - f_sub.getbbox(subtitle)[1])
+        sy = max(sy, title_bottom + gap - f_sub.getbbox(subtitle)[1]) if title else sy
+        sy = min(sy, h - f_sub.getbbox(subtitle)[3] - gap - 3)
         ctx.draw_text_wrapper(draw, subtitle, sx+3, sy+3, f_sub, subtitle_width, shadow_color)
         ctx.draw_text_wrapper(draw, subtitle, sx, sy, f_sub, subtitle_width, subtitle_color)
         

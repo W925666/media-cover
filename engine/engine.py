@@ -301,7 +301,8 @@ class PosterEngine:
     def fit_single_line_font(self, font, text, max_width):
         """英文副标题完整保留单行，缩小到可用宽度而非拆断单词。"""
         size = getattr(font, 'size', 1)
-        while size > 1 and font.getlength(str(text)) > max_width:
+        lines = str(text).splitlines() or ['']
+        while size > 1 and max(font.getlength(line) for line in lines) > max_width:
             size -= 1
             font = font.font_variant(size=size)
         return font

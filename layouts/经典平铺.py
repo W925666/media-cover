@@ -1,5 +1,49 @@
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
+def _fit_text_block(ctx, title, subtitle, title_font, subtitle_font, width, height, gap):
+    """保留文字起点；副标题先适配单行，再给整个文字块预留画布高度。"""
+    width, height = max(1, width), max(1, height)
+    if subtitle:
+        for line in str(subtitle).splitlines():
+            subtitle_font = ctx.fit_single_line_font(subtitle_font, line, width)
+    if title and str(title).isascii():
+        for line in str(title).splitlines():
+            title_font = ctx.fit_single_line_font(title_font, line, width)
+
+    def block_height(text, font):
+        if not text:
+            return 0
+        count = 0
+        for paragraph in str(text).splitlines() or [str(text)]:
+            count += 1
+            current = ''
+            for char in paragraph:
+                if current and font.getlength(current + char) > width:
+                    count += 1
+                    current = char
+                else:
+                    current += char
+        try:
+            ascent, descent = font.getmetrics()
+            line_height = ascent + descent + 10
+        except AttributeError:
+            box = font.getbbox('Hg')
+            line_height = box[3] - box[1] + 10
+        return count * line_height
+
+    gap = max(0, gap) if title and subtitle else 0
+    while block_height(title, title_font) + gap + block_height(subtitle, subtitle_font) > height:
+        candidates = [(bool(title), title_font), (bool(subtitle), subtitle_font)]
+        if not any(present and getattr(font, 'size', 1) > 1 for present, font in candidates):
+            gap = 0
+            break
+        if title and getattr(title_font, 'size', 1) > 1:
+            title_font = title_font.font_variant(size=title_font.size - 1)
+        if subtitle and getattr(subtitle_font, 'size', 1) > 1:
+            subtitle_font = subtitle_font.font_variant(size=subtitle_font.size - 1)
+    return title_font, subtitle_font, gap
+
+
 # === 辅助函数：圆角处理 ===
 def add_rounded_corners(im, radius):
     if radius <= 0: return im
@@ -167,15 +211,17 @@ def render(ctx, bg, config, assets, fonts):
     c_title = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
     c_sub = ctx.resolve_text_fill(config, 'subtitle', '#DDDDDD')
     
-    # 标题
+    cx = max(0, min(width - 1, cx))
+    cy = max(0, min(height - 1, cy))
+    mw = max(1, min(mw, width - cx))
     title = config.get('title', '')
+    subtitle = config.get('subtitle', '')
+    f_title, f_sub, gap = _fit_text_block(
+        ctx, title, subtitle, f_title, f_sub, mw, height - cy, int(config.get('gap_1', 20)))
     if title:
         cy = ctx.draw_text_wrapper(draw, title, cx, cy, f_title, mw, c_title)
-        cy += int(config.get('gap_1', 20))
-    
-    # 副标题
-    subtitle = config.get('subtitle', '')
-    if subtitle:
+        cy += gap
+    if subtitle and cy < height:
         ctx.draw_text_wrapper(draw, subtitle, cx, cy, f_sub, mw, c_sub)
     
     return bg

@@ -270,6 +270,21 @@ def _draw_text(ctx, canvas, config, fonts):
     # 小尺寸 GIF 中书法字体的彩色笔画容易融入背景，增加轻量描边式阴影，
     # 保持 FrameBase 构图不变但提高媒体库网格里的可读性。
     shadow_dx = max(2, round(width / 180))
+    # 先按显式行缩字，防止引擎将英文逐字符折行；阴影复用同一字体。
+    def fit_block(font, text, max_width, available_height, spacing=10):
+        lines = str(text or '').splitlines() or ['']
+        font = ctx.fit_single_line_font(font, max(lines, key=font.getlength), max(1, max_width))
+        def block_height():
+            ascent, descent = font.getmetrics()
+            return len(lines) * (ascent + descent + spacing)
+        while font.size > 1 and block_height() > available_height:
+            font = font.font_variant(size=font.size - 1)
+        return font, block_height()
+
+    sub_x = max(0, min(int(width * float(config.get("subtitle_pos_x", 6)) / 100), width - shadow_dx - 1))
+    sub_width = max(1, min(int(width * float(config.get("sub_width_pct", 40)) / 100), width - sub_x - shadow_dx))
+    subtitle_font, sub_height = fit_block(subtitle_font, subtitle, sub_width, height * 0.25)
+    gap = max(shadow_dx + 2, round(subtitle_font.size * 0.28))
     title_bottom = 0
     if title:
         x = int(width * float(config.get("title_pos_x", 6)) / 100)
@@ -288,6 +303,13 @@ def _draw_text(ctx, canvas, config, fonts):
                 bbox = title_font.getbbox("国Hg")
                 line_height = bbox[3] - bbox[1]
             y -= round(line_height * 0.48)
+        x = max(shadow_dx, min(x, width - shadow_dx - 1))
+        max_width = max(1, min(max_width, width - x - shadow_dx))
+        title_text = '\n'.join(title_lines)
+        reserve = sub_height + gap + shadow_dx if subtitle else shadow_dx
+        y = max(shadow_dx, min(y, height - reserve - 4))
+        title_font, _ = fit_block(title_font, title_text, max_width, height - y - reserve, spacing=0)
+        line_height = sum(title_font.getmetrics())
         title_fill = ctx.resolve_text_fill(
             config, "title", "#FFFFFF", config.get("title_opacity", 255)
         )
@@ -307,20 +329,11 @@ def _draw_text(ctx, canvas, config, fonts):
                 ),
             )
     if subtitle:
-        x = int(width * float(config.get("subtitle_pos_x", 6)) / 100)
+        x = sub_x
         configured_y = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
-        # 两行或自动折行后的标题必须把副标题整体下移。旧逻辑只把标题向上
-        # 展开，却仍在固定55%位置画副标题，导致英文压进第二行或被遮挡。
-        try:
-            sub_ascent, sub_descent = subtitle_font.getmetrics()
-            subtitle_line_height = sub_ascent + sub_descent
-        except Exception:
-            subtitle_bbox = subtitle_font.getbbox("Ag")
-            subtitle_line_height = subtitle_bbox[3] - subtitle_bbox[1]
-        gap = max(4, round(subtitle_line_height * 0.28))
-        y = max(configured_y, title_bottom + gap) if title_bottom else configured_y
-        y = min(y, max(0, height - subtitle_line_height - gap))
-        max_width = int(width * float(config.get("sub_width_pct", 40)) / 100)
+        # 先限制配置坐标，再应用标题后 Y 下限，避免回钳导致重叠。
+        y = max(0, min(configured_y, height - sub_height - shadow_dx), title_bottom + gap if title else 0)
+        max_width = sub_width
         if shadow_opacity > 0:
             ctx.draw_text_wrapper(draw, subtitle, x + shadow_dx, y + shadow_dx, subtitle_font, max_width, (0, 0, 0, shadow_opacity))
         ctx.draw_text_wrapper(

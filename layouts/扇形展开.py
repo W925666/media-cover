@@ -222,24 +222,28 @@ def render(ctx, bg, config, assets, fonts):
     c_title = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
     c_sub = ctx.resolve_text_fill(config, 'subtitle', '#AAAAAA')
     
-    # 绘制主标题
+    def fit_block(font, text, available_height):
+        lines = str(text or '').splitlines() or ['']
+        font = ctx.fit_single_line_font(font, max(lines, key=font.getlength), max(1, canvas_w - 4))
+        def block_height():
+            ascent, descent = font.getmetrics()
+            return len(lines) * (ascent + descent + 10)
+        while font.size > 1 and block_height() > available_height:
+            font = font.font_variant(size=font.size - 1)
+        return font, block_height()
+
+    f_sub, sub_height = fit_block(f_sub, subtitle, canvas_h * 0.25)
+    gap = max(4, round(f_sub.size * 0.28))
+    reserve = sub_height + gap + 2 if subtitle else 2
+    text_y = max(0, min(canvas_h // 2 + int(config.get('title_offset_y', -280)), canvas_h - reserve - 13 * len(str(title or '').splitlines() or [''])))
+    f_title, _ = fit_block(f_title, title, canvas_h - text_y - reserve)
+    title_bottom = 0
     if title:
-        # 使用独立的偏移量
-        offset_y = int(config.get('title_offset_y', -280))
-        text_y = (canvas_h // 2) + offset_y
-        
-        # 居中绘制
-        ctx.draw_text_wrapper(draw, title, canvas_w // 2, text_y, f_title, canvas_w, c_title, align='center')
-        
-    # 绘制副标题
+        title_bottom = ctx.draw_text_wrapper(draw, title, canvas_w // 2, text_y, f_title, canvas_w - 4, c_title, align='center')
+
     if subtitle:
-        # 使用独立的偏移量 (如果不设置，默认给一个相对位置)
-        sub_offset_y = int(config.get('subtitle_offset_y', -200))
-        
-        # 如果用户没有特意去调副标题位置（还是默认值），我们可以做一个简单的智能判断
-        # 但为了参数逻辑清晰，这里完全遵从 sub_offset_y，即相对于画面中心
-        sub_y = (canvas_h // 2) + sub_offset_y
-        
-        ctx.draw_text_wrapper(draw, subtitle, canvas_w // 2, sub_y, f_sub, canvas_w, c_sub, align='center')
+        configured_y = canvas_h // 2 + int(config.get('subtitle_offset_y', -200))
+        sub_y = max(0, min(configured_y, canvas_h - sub_height - 2), title_bottom + gap if title else 0)
+        ctx.draw_text_wrapper(draw, subtitle, canvas_w // 2, sub_y, f_sub, canvas_w - 4, c_sub, align='center')
 
     return bg

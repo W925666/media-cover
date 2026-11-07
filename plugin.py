@@ -599,17 +599,7 @@ class Plugin(BasePlugin):
         }
         # 先加载 FrameBase 随布局发布的原版默认预设，再用布局 schema 补齐预设
         # 未声明的键。这样布局、坐标、比例、阴影、模糊与上游默认效果保持一致。
-        config: dict[str, Any] = self._load_layout_preset(layout)
-        layout_module = self.engine().layout_modules.get(layout)
-        if layout_module is not None and hasattr(layout_module, "get_schema"):
-            try:
-                for group in layout_module.get_schema() or []:
-                    for item_schema in group.get("items", []) or []:
-                        key = item_schema.get("key")
-                        if key and "default" in item_schema and key not in config:
-                            config[key] = item_schema["default"]
-            except Exception as e:
-                ctx.mt.log(level="warn", message=f"读取布局默认参数失败：{layout}；{e}")
+        config: dict[str, Any] = self._layout_defaults(layout)
         config.update({
             "engine": layout,
             "title": input.get("title") or title,
@@ -886,6 +876,23 @@ class Plugin(BasePlugin):
             pass
         return {}
 
+    def _layout_defaults(self, layout: str) -> dict:
+        """页面提示与渲染共同使用一份布局默认参数。"""
+        config = self._load_layout_preset(layout)
+        render = self.engine().layout_modules.get(layout)
+        # layout_modules 存储的是 render 函数，不是模块对象。
+        schema = getattr(render, '__globals__', {}).get('get_schema')
+        if callable(schema):
+            for group in schema() or []:
+                for field in group.get('items', []) or []:
+                    if field.get('key') and 'default' in field:
+                        config.setdefault(field['key'], field['default'])
+        if 'subtitle_size' not in config and 'sub_size' in config:
+            config['subtitle_size'] = config['sub_size']
+        if 'font_subtitle' not in config and 'font_sub' in config:
+            config['font_subtitle'] = config['font_sub']
+        return config
+
     def _load_template(self, ctx: Context, name: str) -> dict:
         """按模板名加载配置：优先用户保存的，其次内置预设 JSON。"""
         import json as _json
@@ -975,6 +982,15 @@ class Plugin(BasePlugin):
         for key in ("titleColorMode", "subtitleColorMode", "badgeColorMode"):
             if defaults.get(key) == "rainbow_gradient":
                 defaults[key] = "rainbow"
+        typography_hints = []
+        for layout_name in self.engine().layout_modules:
+            preset = self._layout_defaults(layout_name)
+            title_size = preset.get('title_size', 160)
+            subtitle_size = preset.get('subtitle_size', preset.get('sub_size', 80))
+            typography_hints.append(ui.Text(
+                text=f"{layout_name} · 默认主标题大小：{title_size} px；默认副标题大小：{subtitle_size} px。布局原始字体：主标题 {preset.get('font_title', 'OPPOSans-B.ttf')}，副标题 {preset.get('font_subtitle', 'OPPOSans-B.ttf')}。当前字体以下拉框选择为准；大小留空时使用此值，填写后使用填写值（长文字可能自适应缩小）。",
+                visible=ui.expr('eq', ui.ref('state.layout'), layout_name),
+            ))
         return ui.page(
             ui.Card(
                 ui.Text(text="Cover Studio · 封面创作。默认随机从目标媒体库取背景图和海报。"),
@@ -1087,7 +1103,9 @@ class Plugin(BasePlugin):
                 ui.Input(label="海报数量（奇数）", bind="state.posterCount", type="number"),
                 ui.Input(label="主标题内容（留空自动）", bind="state.title"),
                 ui.Input(label="副标题内容（留空自动）", bind="state.subtitle"),
-                ui.Input(label="主标题大小（留空使用布局默认）", bind="state.titleSize", type="number"),
+                *typography_hints,
+                ui.Text(text="页面初始字体：主标题、副标题、角标均为剑豪体.ttf；已保存的选择优先，当前字体名称显示在下拉框中。字号为 1920×1080 设计尺寸，动态输出会按分辨率等比例缩放。"),
+                ui.Input(label="主标题大小（留空使用上方默认值）", bind="state.titleSize", type="number"),
                 ui.Input(label="副标题大小（留空使用布局默认）", bind="state.subtitleSize", type="number"),
                 ui.Select(label="主标题颜色模式", bind="state.titleColorMode", options=[
                     {"label": "固定颜色", "value": "solid"},

@@ -1,6 +1,24 @@
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 
 
+def _fit_title_height(font, text, max_width, available_height):
+    while True:
+        lines = 0
+        for paragraph in str(text).splitlines() or [str(text)]:
+            current = ''
+            lines += 1
+            for char in paragraph:
+                if current and font.getlength(current + char) > max_width:
+                    lines += 1
+                    current = char
+                else:
+                    current += char
+        ascent, descent = font.getmetrics()
+        if lines * (ascent + descent + 10) <= available_height or font.size <= 1:
+            return font
+        font = font.font_variant(size=font.size - 1)
+
+
 def _rounded(image, radius):
     image = image.convert("RGBA")
     if radius <= 0:
@@ -147,6 +165,14 @@ def _draw_text(ctx, canvas, config, fonts):
     title_y = int(height * float(config.get("title_y", 40)) / 100)
     subtitle_x = int(width * float(config.get("subtitle_x", 8)) / 100)
     subtitle_y = int(height * float(config.get("subtitle_y", 58)) / 100)
+    subtitle_width = max(1, min(int(width * 0.34) - subtitle_x, width - subtitle_x))
+    gap = max(2, round(height * 0.018))
+    if subtitle:
+        subtitle_font = ctx.fit_single_line_font(subtitle_font, subtitle, subtitle_width)
+    reserve = (subtitle_font.getbbox(subtitle)[3] - subtitle_font.getbbox(subtitle)[1] + 2 * gap) if subtitle else gap
+    minimum_title_height = 13 * max(1, len(str(title).splitlines()))
+    title_y = max(0, min(title_y, height - reserve - minimum_title_height))
+    title_font = _fit_title_height(title_font, title, width // 2, max(1, height - title_y - reserve))
     accent = config.get("accent_color", "#32D6C6")
     # 装饰竖条属于中文主标题，按输出分辨率缩放并放在主标题左侧。
     design_scale = width / 1920.0
@@ -156,6 +182,8 @@ def _draw_text(ctx, canvas, config, fonts):
     safe_margin = max(4, round(16 * design_scale))
     title_x = max(title_x, safe_margin + bar_width + bar_gap)
     bar_right = title_x - bar_gap
+    title_width = max(1, int(width * 0.34) - title_x - safe_margin)
+    title_font = ctx.fit_single_line_font(title_font, title, title_width)
     first_line = str(title).splitlines()[0] if title else '国'
     ink_bbox = title_font.getbbox(first_line)
     bar_top = title_y + ink_bbox[1]
@@ -168,14 +196,12 @@ def _draw_text(ctx, canvas, config, fonts):
     title_bottom = title_y
     if title:
         title_bottom = ctx.draw_text_wrapper(
-            draw, title, title_x, title_y, title_font, width // 2,
+            draw, title, title_x, title_y, title_font, title_width,
             ctx.resolve_text_fill(config, "title", "#FFFFFF", config.get("title_opacity", 255)),
         )
     if subtitle:
-        subtitle_width = max(1, int(width * 0.34) - subtitle_x)
-        subtitle_font = ctx.fit_single_line_font(subtitle_font, subtitle, subtitle_width)
-        gap = max(2, round(height * 0.018))
-        subtitle_y = max(subtitle_y, title_bottom + gap - subtitle_font.getbbox(subtitle)[1])
+        subtitle_y = max(subtitle_y, title_bottom + gap - subtitle_font.getbbox(subtitle)[1]) if title else subtitle_y
+        subtitle_y = min(subtitle_y, height - subtitle_font.getbbox(subtitle)[3] - gap)
         ctx.draw_text_wrapper(
             draw, subtitle, subtitle_x, subtitle_y, subtitle_font, subtitle_width,
             ctx.resolve_text_fill(config, "subtitle", "#FFFFFF", config.get("subtitle_opacity", 230)),

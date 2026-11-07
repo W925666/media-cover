@@ -1,5 +1,34 @@
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageColor
 
+def _fit_text_block(ctx, title, subtitle, title_font, subtitle_font, width, height, gap):
+    width, height = max(1, width), max(1, height)
+    # 副标题保持整行；英文标题也优先缩放而非拆断单词。
+    for text, is_sub in ((title, False), (subtitle, True)):
+        font = subtitle_font if is_sub else title_font
+        if text and (is_sub or str(text).isascii()):
+            for line in str(text).splitlines():
+                font = ctx.fit_single_line_font(font, line, width)
+        if is_sub:
+            subtitle_font = font
+        else:
+            title_font = font
+    def text_height(text, font):
+        class Measure:
+            def text(self, *args, **kwargs):
+                pass
+        return ctx.draw_text_wrapper(Measure(), text, 0, 0, font, width, '#FFFFFF') if text else 0
+    gap = max(0, gap) if title and subtitle else 0
+    while text_height(title, title_font) + gap + text_height(subtitle, subtitle_font) > height:
+        if not any(text and getattr(font, 'size', 1) > 1 for text, font in ((title, title_font), (subtitle, subtitle_font))):
+            gap = 0
+            break
+        if title and getattr(title_font, 'size', 1) > 1:
+            title_font = title_font.font_variant(size=title_font.size - 1)
+        if subtitle and getattr(subtitle_font, 'size', 1) > 1:
+            subtitle_font = subtitle_font.font_variant(size=subtitle_font.size - 1)
+    return title_font, subtitle_font, gap
+
+
 # =============================================================================
 # 1. 辅助函数
 # =============================================================================
@@ -182,15 +211,17 @@ def render(ctx, bg, config, assets, fonts):
     t_color = ctx.resolve_text_fill(config, 'title', '#FFFFFF', config.get('title_opacity', 255))
     s_color = ctx.resolve_text_fill(config, 'subtitle', '#DDDDDD', config.get('subtitle_opacity', 180))
 
-    # 绘制主标题
+    cx = max(0, min(width - 1, cx))
+    cy = max(0, min(height - 1, cy))
+    mw = max(1, min(mw, width - cx))
     title = config.get('title', '')
+    subtitle = config.get('subtitle', '')
+    f_title, f_sub, gap = _fit_text_block(
+        ctx, title, subtitle, f_title, f_sub, mw, height - cy, int(config.get('gap_1', 20)))
     if title:
         cy = ctx.draw_text_wrapper(draw, title, cx, cy, f_title, mw, t_color)
-        cy += int(config.get('gap_1', 20))
-    
-    # 绘制副标题
-    subtitle = config.get('subtitle', '')
-    if subtitle:
+        cy += gap
+    if subtitle and cy < height:
         ctx.draw_text_wrapper(draw, subtitle, cx, cy, f_sub, mw, s_color)
     
     return bg

@@ -1,6 +1,25 @@
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageColor
 import math
 
+def _fit_title_height(font, text, max_width, available_height):
+    """Match wrapper line metrics before painting, leaving room for the subtitle."""
+    while True:
+        lines = 0
+        for paragraph in str(text).splitlines() or [str(text)]:
+            current = ''
+            lines += 1
+            for char in paragraph:
+                if current and font.getlength(current + char) > max_width:
+                    lines += 1
+                    current = char
+                else:
+                    current += char
+        ascent, descent = font.getmetrics()
+        if lines * (ascent + descent + 10) <= available_height or font.size <= 1:
+            return font
+        font = font.font_variant(size=font.size - 1)
+
+
 def get_schema():
     return [
         # --- 1. 核心资源与内容 ---
@@ -139,8 +158,17 @@ def render(ctx, bg, config, assets, fonts):
     title_off = int(config.get('title_offset_y', -40))
     title_color = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
     
+    title_bottom = cy_center + title_off
+    subtitle = config.get('subtitle', '')
+    if subtitle:
+        f_sub = ctx.fit_single_line_font(f_sub, subtitle, max(1, min(mw, width)))
+    gap = max(4, round(height * 0.018))
+    reserve = (f_sub.getbbox(subtitle)[3] - f_sub.getbbox(subtitle)[1] + 2 * gap) if subtitle else gap
+    minimum_title_height = 13 * max(1, len(str(title).splitlines()))
+    title_bottom = max(0, min(title_bottom, height - reserve - minimum_title_height))
+    f_title = _fit_title_height(f_title, title, max(1, mw), max(1, height - title_bottom - reserve))
     if title:
-        ctx.draw_text_wrapper(draw, title, cx, cy_center + title_off, f_title, mw, title_color, align='center')
+        title_bottom = ctx.draw_text_wrapper(draw, title, cx, title_bottom, f_title, mw, title_color, align='center')
     
     # 绘制副标题
     subtitle = config.get('subtitle', '')
@@ -148,6 +176,10 @@ def render(ctx, bg, config, assets, fonts):
     sub_color = ctx.resolve_text_fill(config, 'subtitle', '#CCCCCC')
     
     if subtitle:
-        ctx.draw_text_wrapper(draw, subtitle, cx, cy_center + sub_off, f_sub, mw, sub_color, align='center')
+        f_sub = ctx.fit_single_line_font(f_sub, subtitle, max(1, min(mw, width)))
+        gap = max(4, round(height * 0.018))
+        sub_y = max(cy_center + sub_off, title_bottom + gap - f_sub.getbbox(subtitle)[1]) if title else cy_center + sub_off
+        sub_y = min(sub_y, height - f_sub.getbbox(subtitle)[3] - gap)
+        ctx.draw_text_wrapper(draw, subtitle, cx, sub_y, f_sub, mw, sub_color, align='center')
     
     return bg

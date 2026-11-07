@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw, ImageFilter, ImageEnhance, ImageOps, ImageFont, ImageColor
+from PIL import Image, ImageDraw, ImageFilter, ImageEnhance, ImageOps, ImageFont, ImageColor, ImageChops
 import math
 import os
 import traceback
@@ -119,13 +119,30 @@ def get_font_obj(fonts, config_font_name, size, fallback_key='main'):
     except: return ImageFont.load_default()
 
 def measure_text_width(text, font, spacing=0):
+    text = str(text or '').replace('\n', ' ')
     if not text: return 0
     try:
         widths = [font.getlength(char) for char in text]
         return sum(widths) + (len(text) - 1) * spacing
     except: return font.getbbox(text)[2]
 
+def fit_spaced_font(ctx, text, font, max_width, spacing=0, stroke_width=0):
+    """字间距与描边均计入可用宽度，不把英文副标题拆成字符行。"""
+    text = str(text or '')
+    available = max(1, max_width - stroke_width * 2 - 10)
+    if len(text) > 1 and spacing > 0:
+        spacing = min(spacing, available / (2 * (len(text) - 1)))
+    font = ctx.fit_single_line_font(font, text, max(1, available - max(0, len(text) - 1) * spacing))
+    while getattr(font, 'size', 1) > 1 and measure_text_width(text, font, spacing) > available:
+        font = font.font_variant(size=font.size - 1)
+    if text and spacing < 0:
+        # 缩小字号后仍让字符前进，避免负间距产生反向布局或负尺寸图层。
+        spacing = max(spacing, -min(font.getlength(char) for char in text) / 2)
+    return font, spacing
+
+
 def create_gradient_text(text, font, color_top, color_bottom, spacing=0):
+    text = str(text or '').replace('\n', ' ')
     if not text: return None, 0, 0
     widths = [font.getlength(char) for char in text]
     total_w = int(sum(widths) + (len(text) - 1) * spacing)
@@ -399,11 +416,17 @@ def render(ctx, bg, config, assets, fonts):
         draw = ImageDraw.Draw(bg)
         
         # --- 主标题 ---
-        t_str = config.get('title', '华语电影')
+        t_str = str(config.get('title', '华语电影')).replace('\n', ' ')
         t_size = int(config.get('title_size', 160))
         t_spacing = int(config.get('title_spacing', 0))
         t_y = int(config.get('title_y', 140))
         t_font = get_font_obj(fonts, config.get('font_title'), t_size)
+        t_font, t_spacing = fit_spaced_font(ctx, t_str, t_font, canvas_w, t_spacing, 4)
+        subtitle_reserve = (max(1, int(config.get('subtitle_stroke_width', 3))) * 2 + 30
+                            if config.get('subtitle', 'CHINESE MOVIES') else 0)
+        while getattr(t_font, 'size', 1) > 1 and t_font.getbbox(t_str or 'Hg')[3] + 4 + subtitle_reserve > canvas_h - max(0, t_y):
+            t_font = t_font.font_variant(size=t_font.size - 1)
+        t_y = max(4, min(t_y, canvas_h - t_font.getbbox(t_str or 'Hg')[3] - 4 - subtitle_reserve))
         text_width = measure_text_width(t_str, t_font, t_spacing)
         
         # 麦穗
@@ -432,15 +455,30 @@ def render(ctx, bg, config, assets, fonts):
         
         subtitle_y = int(config.get('subtitle_y', 980))
         subtitle_fill = ctx.resolve_text_fill(config, 'subtitle', '#FFFFFF')
-        if isinstance(subtitle_fill, dict):
-            ctx.draw_text_wrapper(draw, s_str, center_x, subtitle_y, s_font, bg.width, subtitle_fill, align='center')
-        else:
-            draw_text_simple(
-                draw, s_str, center_x, subtitle_y, s_font, subtitle_fill,
-                spacing=int(config.get('subtitle_spacing', 10)),
-                stroke_width=s_stroke_w,
-                stroke_fill=s_stroke_c
-            )
+        # 荣耀视界保留上下独立起点，仅在实际文字碰撞时向下避让。
+        s_spacing = int(config.get('subtitle_spacing', 10))
+        s_font, s_spacing = fit_spaced_font(ctx, s_str, s_font, canvas_w, s_spacing, s_stroke_w)
+        title_bottom = t_y + max(gh, t_font.getbbox(t_str or 'Hg')[3]) + 4 if t_str else 0
+        subtitle_y = max(s_stroke_w, subtitle_y, title_bottom + 10 if t_str else 0)
+        while getattr(s_font, 'size', 1) > 1 and subtitle_y + s_font.getbbox(s_str or 'Hg')[3] + s_stroke_w > canvas_h:
+            s_font = s_font.font_variant(size=s_font.size - 1)
+        subtitle_y = min(subtitle_y, canvas_h - s_font.getbbox(s_str or 'Hg')[3] - s_stroke_w)
+        if s_str:
+            if isinstance(subtitle_fill, dict):
+                # 使用同一字符位置绘制描边和渐变，避免渐变分支丢失字间距/描边。
+                text_mask = Image.new('L', bg.size, 0)
+                mask_draw = ImageDraw.Draw(text_mask)
+                draw_text_simple(draw, s_str, center_x, subtitle_y, s_font, s_stroke_c,
+                                 spacing=s_spacing, stroke_width=s_stroke_w, stroke_fill=s_stroke_c)
+                draw_text_simple(mask_draw, s_str, center_x, subtitle_y, s_font, 255, spacing=s_spacing)
+                box = text_mask.getbbox()
+                if box:
+                    paint = ctx._make_gradient((box[2] - box[0], box[3] - box[1]), subtitle_fill)
+                    paint.putalpha(ImageChops.multiply(paint.getchannel('A'), text_mask.crop(box)))
+                    bg.alpha_composite(paint, (box[0], box[1]))
+            else:
+                draw_text_simple(draw, s_str, center_x, subtitle_y, s_font, subtitle_fill,
+                                 spacing=s_spacing, stroke_width=s_stroke_w, stroke_fill=s_stroke_c)
 
         # 6. 全局遮罩 (Layer 5 - 最顶层)
         v_strength = float(config.get('vignette_strength', 60)) / 100.0

@@ -212,6 +212,23 @@ def get_schema():
 # =============================================================================
 # 3. 渲染逻辑
 # =============================================================================
+def _fit_text_block(ctx, font, text, max_width, max_height, line_spacing=10):
+    """保留显式换行；每行缩字适配，避免英文被引擎逐字符折行。"""
+    lines = str(text or '').splitlines() or ['']
+    longest = max(lines, key=lambda line: font.getlength(line))
+    font = ctx.fit_single_line_font(font, longest, max(1, max_width))
+    def block_height():
+        try:
+            ascent, descent = font.getmetrics()
+            return len(lines) * (ascent + descent + line_spacing)
+        except AttributeError:
+            box = font.getbbox('Hg')
+            return len(lines) * (box[3] - box[1] + line_spacing)
+    while getattr(font, 'size', 1) > 1 and block_height() > max_height:
+        font = font.font_variant(size=font.size - 1)
+    return font, block_height()
+
+
 def render(ctx, bg, config, assets, fonts):
     poster_urls = assets.get('posters', [])
     if not poster_urls: return bg
@@ -321,12 +338,22 @@ def render(ctx, bg, config, assets, fonts):
     sy = int(height * (float(config.get('subtitle_pos_y', 55)) / 100))
     mw_sub = int(width * (float(config.get('sub_width_pct', 40)) / 100))
     
+    tx, sx = max(0, min(tx, width - 4)), max(0, min(sx, width - 3))
+    mw_title = max(1, min(mw_title, width - tx - 3))
+    mw_sub = max(1, min(mw_sub, width - sx - 2))
+    f_sub_path, sub_height = _fit_text_block(ctx, f_sub_path, subtitle_str, mw_sub, height * 0.25)
+    gap = max(4, round(getattr(f_sub_path, 'size', 1) * 0.28))
+    reserve = sub_height + gap + 3 if subtitle_str else 3
+    ty = max(0, min(ty, height - reserve - 13 * len(str(title_str or '').splitlines() or [''])))
+    f_title_path, _ = _fit_text_block(ctx, f_title_path, title_str, mw_title, height - ty - reserve)
+    title_bottom = 0
     if title_str:
         if shadow_op > 0:
             ctx.draw_text_wrapper(draw, title_str, tx + 3, ty + 3, f_title_path, mw_title, shadow_color)
-        ctx.draw_text_wrapper(draw, title_str, tx, ty, f_title_path, mw_title, t_color)
-        
+        title_bottom = ctx.draw_text_wrapper(draw, title_str, tx, ty, f_title_path, mw_title, t_color)
+
     if subtitle_str:
+        sy = max(min(sy, height - sub_height - 2), title_bottom + gap if title_str else 0)
         if shadow_op > 0:
             ctx.draw_text_wrapper(draw, subtitle_str, sx + 2, sy + 2, f_sub_path, mw_sub, shadow_color)
         ctx.draw_text_wrapper(draw, subtitle_str, sx, sy, f_sub_path, mw_sub, s_color)
