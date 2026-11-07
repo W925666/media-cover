@@ -390,16 +390,31 @@ class Plugin(BasePlugin):
         item = ctx.mt.emby.request(
             server_id=server_id,
             path="/Items",
-            query={"Ids": target_id, "Fields": "ProductionYear"},
+            query={"Ids": target_id, "Fields": "ProductionYear,CollectionType"},
         ) or {}
         if item.get("status") == 200 and isinstance(item.get("data"), dict):
             rows = item["data"].get("Items", [])
             if rows:
-                title = rows[0].get("Name") or ""
-                year = rows[0].get("ProductionYear")
-                subtitle = str(year) if year else ""
+                row = rows[0]
+                title = row.get("Name") or ""
+                collection_type = str(row.get("CollectionType") or "").lower()
+                subtitle = {
+                    "movies": "MOVIES",
+                    "tvshows": "TV SHOWS",
+                    "music": "MUSIC",
+                    "boxsets": "COLLECTIONS",
+                    "books": "BOOKS",
+                    "homevideos": "VIDEOS",
+                    "musicvideos": "MUSIC VIDEOS",
+                    "photos": "PHOTOS",
+                    "playlists": "PLAYLISTS",
+                }.get(collection_type, "MEDIA LIBRARY")
+                # 普通媒体条目仍用年份；媒体库封面使用媒体库英文类型。
+                if not collection_type:
+                    year = row.get("ProductionYear")
+                    subtitle = str(year) if year else "MEDIA LIBRARY"
         if not title:
-            title = input.get("title") or "封面"
+            title = "封面"
 
         # 2. 素材图（两种来源，Emby 优先，不需要映射本地目录）：
         #    a) Emby 模式：配置 embyUrl + embyApiKey 且传入 libraryId 时，
@@ -472,8 +487,8 @@ class Plugin(BasePlugin):
             # 容器 worker 内存预算小，帧数必须压低，否则 worker 被 OOM 杀掉
             "enable_animation": "动态" in layout,
             "anim_duration": 100,
-            # 对齐 FrameBase 旋转动态预设：2500ms 轮换、3 张海报、过渡旋转 38 度
-            "poster_count": 3,
+            # 默认取 9 张；页面可自行调整。旋转动态同样遵循所选数量。
+            "poster_count": max(1, int(input.get("posterCount") or 9)),
             "switch_interval": 2500,
             "transition_ms": 900,
             "transition_spin": 38,
@@ -740,6 +755,10 @@ class Plugin(BasePlugin):
                         "fontSubtitle": ui.ref("state.fontSubtitle"),
                         "badgeStyle": ui.ref("state.badgeStyle"),
                         "badgeFont": ui.ref("state.badgeFont"),
+                        "badgeSize": ui.ref("state.badgeSize"),
+                        "posterCount": ui.ref("state.posterCount"),
+                        "title": ui.ref("state.title"),
+                        "subtitle": ui.ref("state.subtitle"),
                         "upload": True,
                     },
                 }]),
@@ -752,11 +771,20 @@ class Plugin(BasePlugin):
                         "badgeStyle": ui.ref("state.badgeStyle"),
                         "badgeFont": ui.ref("state.badgeFont"),
                         "badgeSize": ui.ref("state.badgeSize"),
+                        "posterCount": ui.ref("state.posterCount"),
+                        "title": ui.ref("state.title"),
+                        "subtitle": ui.ref("state.subtitle"),
                     },
                 }]),
             ),
             ui.Card(
-                ui.Text(text="字体与角标（其他尺寸、位置、颜色和布局细节均使用所选布局的上游默认值）。"),
+                ui.Text(text="资源与内容。标题留空时：主标题自动使用媒体库名称，副标题自动使用媒体库英文类型。"),
+                ui.Input(label="海报数量（奇数）", bind="state.posterCount", type="number"),
+                ui.Input(label="主标题内容（留空自动）", bind="state.title"),
+                ui.Input(label="副标题内容（留空自动）", bind="state.subtitle"),
+            ),
+            ui.Card(
+                ui.Text(text="字体与角标（其他位置、颜色和布局细节均使用所选布局的上游默认值）。"),
                 ui.Select(label="主标题字体", bind="state.fontTitle",
                           options=ui.ref("query.fonts.data")),
                 ui.Select(label="副标题字体", bind="state.fontSubtitle",
@@ -779,6 +807,7 @@ class Plugin(BasePlugin):
                 ]),
                 ui.Select(label="徽章字体", bind="state.badgeFont",
                           options=ui.ref("query.fonts.data")),
+                ui.Input(label="徽章大小", bind="state.badgeSize", type="number"),
             ),
             ui.RunHistory(),
             ui.RunLog(),
@@ -795,8 +824,11 @@ class Plugin(BasePlugin):
                 "layout": "扇形展开",
                 "fontTitle": "剑豪体.ttf",
                 "fontSubtitle": "剑豪体.ttf",
+                "posterCount": 9,
+                "title": "",
+                "subtitle": "",
                 "badgeStyle": "box",
                 "badgeFont": "剑豪体.ttf",
-                "badgeSize": 90,
+                "badgeSize": 100,
             },
         )
