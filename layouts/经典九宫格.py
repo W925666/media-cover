@@ -269,7 +269,9 @@ def render(ctx, bg, config, assets, fonts):
     tx = int(w * float(config.get('title_x', 5))/100)
     ty = int(h * float(config.get('title_y', 40))/100)
     
-    sx = int(w * float(config.get('sub_x', 8))/100)
+    # 同一文字列；竖条沿上游逻辑附着副标题，不再附着主标题。
+    tx = max(tx, round(w * 56 / 1920))
+    sx = tx
     sy = int(h * float(config.get('sub_y', 58))/100)
     
     subtitle_width = max(1, min(int(w * 0.34) - sx, w - sx - 3))
@@ -281,22 +283,8 @@ def render(ctx, bg, config, assets, fonts):
     ty = max(0, min(ty, h - reserve - minimum_title_height))
     f_title = _fit_title_height(f_title, title, w // 2, max(1, h - ty - reserve))
 
-    # 颜色装饰块属于中文主标题，放在主标题左侧并保留安全边距。
-    random_color = get_random_bright_color() + (255,)
-    bar_gap = 20
-    bar_width = 20
-    bar_height = max(60, int(t_size * 0.65))
-    tx = max(tx, 16 + bar_width + bar_gap)
-    bar_right = tx - bar_gap
     title_width = max(1, int(w * 0.34) - tx - 5)
     f_title = ctx.fit_single_line_font(f_title, title, title_width)
-    # Pillow 的 y 是字体起点，汉字墨迹顶部通常在 y 以下几十像素。
-    title_bbox = draw.multiline_textbbox((tx, ty), str(title), font=f_title)
-    bar_top = int(title_bbox[1])
-    bar_height = max(1, f_title.getbbox(str(title).splitlines()[0] if title else '国')[3]
-                     - f_title.getbbox(str(title).splitlines()[0] if title else '国')[1])
-    if title:
-        draw.rectangle([bar_right - bar_width, bar_top, bar_right, bar_top + bar_height - 1], fill=random_color)
     
     title_color = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
     subtitle_color = ctx.resolve_text_fill(config, 'subtitle', '#FFFFFF')
@@ -310,6 +298,14 @@ def render(ctx, bg, config, assets, fonts):
     if subtitle:
         sy = max(sy, title_bottom + gap - f_sub.getbbox(subtitle)[1]) if title else sy
         sy = min(sy, h - f_sub.getbbox(subtitle)[3] - gap - 3)
+        scale = w / 1920.0
+        bar_width = max(1, round(20 * scale))
+        bar_gap = max(1, round(20 * scale))
+        ink = f_sub.getbbox(str(subtitle))
+        bar_top, bar_bottom = sy + ink[1], sy + ink[3]
+        draw.rectangle((sx - bar_gap - bar_width, bar_top,
+                        sx - bar_gap - 1, max(bar_top, bar_bottom - 1)),
+                       fill=get_random_bright_color() + (255,))
         ctx.draw_text_wrapper(draw, subtitle, sx+3, sy+3, f_sub, subtitle_width, shadow_color)
         ctx.draw_text_wrapper(draw, subtitle, sx, sy, f_sub, subtitle_width, subtitle_color)
         
