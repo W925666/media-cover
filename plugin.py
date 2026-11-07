@@ -11,7 +11,9 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
+import random
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -255,18 +257,25 @@ class Plugin(BasePlugin):
         return _storage_value(ctx.mt.storage.get(key="config")) or {}
 
     def _fetch_emby_posters(self, ctx: Context, server_id: str, library_id: str,
-                            direct: EmbyDirect, count: int = 9) -> tuple[list[str], int, list[str]]:
+                            direct: EmbyDirect, count: int = 9,
+                            source_mode: str = "random") -> tuple[list[str], int, list[str]]:
         """经 SDK 读同库条目（去重：作品名+年份只取一张），直连下载海报。
 
         返回 (图片 URL 列表, 库总数)。库总数用于角标显示——角标必须是
         媒体库的作品总数，不是取到的海报张数。
         """
+        query = {
+            "ParentId": library_id, "Recursive": True,
+            "IncludeItemTypes": "Movie,Series,BoxSet",
+            "Fields": "ProductionYear,ImageTags,BackdropImageTags,DateCreated",
+            "Limit": 300,
+            "EnableTotalRecordCount": True,
+        }
+        # 最新入库交给 Emby 排序；随机模式拉取更大的候选池后在插件端洗牌。
+        if source_mode == "latest":
+            query.update({"SortBy": "DateCreated", "SortOrder": "Descending"})
         result = ctx.mt.emby.request(
-            server_id=server_id, path="/Items",
-            query={"ParentId": library_id, "Recursive": True,
-                   "IncludeItemTypes": "Movie,Series,BoxSet",
-                   "Fields": "ProductionYear,ImageTags,BackdropImageTags", "Limit": 100,
-                   "EnableTotalRecordCount": True},
+            server_id=server_id, path="/Items", query=query,
         ) or {}
         if result.get("status") != 200 or not isinstance(result.get("data"), dict):
             return [], 0, []
@@ -274,7 +283,9 @@ class Plugin(BasePlugin):
             total = int(result["data"].get("TotalRecordCount") or 0)
         except (TypeError, ValueError):
             total = 0
-        items = result["data"].get("Items", []) or []
+        items = list(result["data"].get("Items", []) or [])
+        if source_mode == "random":
+            random.SystemRandom().shuffle(items)
         seen: set[str] = set()
         picked: list[str] = []
         backdrops: list[str] = []
@@ -448,7 +459,13 @@ class Plugin(BasePlugin):
         library_total = 0
         if direct.ok and library_id:
             try:
-                poster_paths, library_total, backdrop_paths = self._fetch_emby_posters(ctx, server_id, str(library_id), direct)
+                source_mode = str(input.get("sourceMode") or "random")
+                poster_paths, library_total, backdrop_paths = self._fetch_emby_posters(
+                    ctx, server_id, str(library_id), direct,
+                    count=max(1, int(input.get("posterCount") or 9)),
+                    source_mode=source_mode,
+                )
+                ctx.mt.log(level="info", message=f"取图模式={source_mode}，候选海报已选 {len(poster_paths)} 张")
             except Exception as e:
                 ctx.mt.log(level="warn", message=f"Emby 海报获取失败，改用本地素材: {e}")
                 poster_paths, library_total, backdrop_paths = [], 0, []
@@ -490,16 +507,16 @@ class Plugin(BasePlugin):
             # 角标数字 = 媒体库作品总数（不是海报张数）
             "count": library_total or len(poster_paths),
         }
-        # 直接按所选布局生成。先读取布局模块自己的 schema 默认值，避免用一套
-        # 全局字号/坐标覆盖所有布局，导致英文副标题折行、标题重叠或画面空白。
-        config: dict[str, Any] = {}
+        # 先加载 FrameBase 随布局发布的原版默认预设，再用布局 schema 补齐预设
+        # 未声明的键。这样布局、坐标、比例、阴影、模糊与上游默认效果保持一致。
+        config: dict[str, Any] = self._load_layout_preset(layout)
         layout_module = self.engine().layout_modules.get(layout)
         if layout_module is not None and hasattr(layout_module, "get_schema"):
             try:
                 for group in layout_module.get_schema() or []:
                     for item_schema in group.get("items", []) or []:
                         key = item_schema.get("key")
-                        if key and "default" in item_schema:
+                        if key and "default" in item_schema and key not in config:
                             config[key] = item_schema["default"]
             except Exception as e:
                 ctx.mt.log(level="warn", message=f"读取布局默认参数失败：{layout}；{e}")
@@ -524,13 +541,6 @@ class Plugin(BasePlugin):
             config["title_size"] = _parse_size(input.get("titleSize"), 160)
         if input.get("subtitleSize") not in (None, ""):
             config["subtitle_size"] = _parse_size(input.get("subtitleSize"), 80)
-        # 英文副标题较长时限制字号，防止窄文本区按字符拆成两三行。
-        # 用户明确填写 subtitleSize 时尊重自定义值。
-        if input.get("subtitleSize") in (None, "") and len(str(config.get("subtitle") or "")) >= 14:
-            current_subtitle_size = int(config.get("subtitle_size") or 80)
-            # 许多 FrameBase 布局的副标题区域只有画布 1/3 左右，固定 80px
-            # 会把 CHINESE ANIMATION 拆行。自动副标题统一收敛到 48px。
-            config["subtitle_size"] = min(current_subtitle_size, 48)
         # 自由设计依赖画布元素。简化页面不提供设计器时，使用可见的通用构图，
         # 而不是只输出一张空色背景。
         if layout == "自由设计" and not config.get("designer_elements"):
@@ -547,12 +557,6 @@ class Plugin(BasePlugin):
                  "w": 820, "h": 180, "font": config.get("font_subtitle"),
                  "fontSize": 64, "color": "#ffffff", "align": "left"},
             ]
-        # 旋转布局：原版 angle_top=0（主卡不转、只有背后模糊卡歪着，看起来没转），
-        # 这里把角度调大，主卡肉眼可见地斜着（模板预设带 angle_top=0 也要覆盖）
-        if layout == "旋转":
-            config["angle_top"] = 15
-            config["angle_mid"] = 28
-            config["angle_bot"] = 42
         # 字体/角标/排版等可选配置：页面或插件 config 里填了才透传，
         # 引擎对不认识的布局会直接忽略多余键
         _extra_str = [
@@ -714,6 +718,25 @@ class Plugin(BasePlugin):
                 out.append({"label": str(t["name"]), "value": str(t["name"])})
         return out
 
+    def _load_layout_preset(self, layout: str) -> dict:
+        """按布局加载 FrameBase 随仓库提供的原版默认预设。"""
+        tpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
+        try:
+            for filename in sorted(os.listdir(tpl_dir)):
+                if not filename.lower().endswith(".json"):
+                    continue
+                try:
+                    with open(os.path.join(tpl_dir, filename), encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    if str(data.get("engine") or "") == layout:
+                        cfg = data.get("config")
+                        return dict(cfg) if isinstance(cfg, dict) else {}
+                except (OSError, ValueError, TypeError):
+                    continue
+        except OSError:
+            pass
+        return {}
+
     def _load_template(self, ctx: Context, name: str) -> dict:
         """按模板名加载配置：优先用户保存的，其次内置预设 JSON。"""
         import json as _json
@@ -777,9 +800,10 @@ class Plugin(BasePlugin):
                 ui.Select(label="媒体库", bind="state.libraryId",
                           options=ui.ref("query.libraries.data")),
                 ui.Select(label="取图模式", bind="state.sourceMode", options=[
-                    {"label": "随机模式", "value": "random"},
+                    {"label": "随机取图", "value": "random"},
+                    {"label": "最新入库", "value": "latest"},
                 ]),
-                ui.Text(text="素材状态：背景图自动取图库 Backdrop；海报自动随机抽取；目标库为上方所选媒体库。"),
+                ui.Text(text="随机取图：每次从最多 300 个候选作品中重新洗牌；最新入库：按 DateCreated 倒序取图。背景优先使用独立 Backdrop。"),
                 ui.Select(label="封面布局", bind="state.layout", options=[
                     {"label": "经典九宫格", "value": "经典九宫格"},
                     {"label": "经典堆叠", "value": "经典堆叠"},
@@ -809,6 +833,7 @@ class Plugin(BasePlugin):
                         # v2 的绑定路径语法不支持这种数组引用。
                         "serverId": ui.ref("state.serverId"),
                         "libraryId": ui.ref("state.libraryId"),
+                        "sourceMode": ui.ref("state.sourceMode"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
                         "fontSubtitle": ui.ref("state.fontSubtitle"),
@@ -824,6 +849,7 @@ class Plugin(BasePlugin):
                 ui.Button(label="🚀 一键生成全部媒体库", onClick=[{
                     "type": "invoke", "actionId": "generate-all",
                     "input": {
+                        "sourceMode": ui.ref("state.sourceMode"),
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
                         "fontSubtitle": ui.ref("state.fontSubtitle"),
