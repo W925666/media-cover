@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "icon.png"
+OUT = ROOT / "ui" / "icon.png"
 FONT = ROOT / "fonts" / "NotoSansCJKsc-Bold.otf"
 S = 1024
 
