@@ -803,9 +803,15 @@ class Plugin(BasePlugin):
                 ui.Button(label="🚀 一键生成封面", onClick=[{
                     "type": "invoke", "actionId": "generate-cover",
                     "input": {
-                        # MediaTidy Select 会视觉上显示首项，但初次打开时 state 值仍
-                        # 可能是 null。服务器和媒体库均由动作内部自动兜底选择，因此
-                        # 页面不提交这两个可能为空的值，避免前端 Schema 提前拦截。
+                        # Select 初次打开时可能只显示首项而 state 仍是 null。提交时
+                        # 优先使用用户选择值，否则读取查询结果的首项，确保既不触发
+                        # Schema 空值错误，也不会忽略用户选中的媒体库。
+                        "serverId": {"$op": "coalesce", "args": [
+                            ui.ref("state.serverId"), ui.ref("query.servers.data.0.value")
+                        ]},
+                        "libraryId": {"$op": "coalesce", "args": [
+                            ui.ref("state.libraryId"), ui.ref("query.libraries.data.0.value")
+                        ]},
                         "layout": ui.ref("state.layout"),
                         "fontTitle": ui.ref("state.fontTitle"),
                         "fontSubtitle": ui.ref("state.fontSubtitle"),
