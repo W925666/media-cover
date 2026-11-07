@@ -184,6 +184,21 @@ class PosterEngine:
                 continue
         return font_filename
 
+    def resolve_font_filename_for_texts(self, font_filename, texts, size=96):
+        """选择能分别覆盖每个标题的统一字体，避免拼接文本检测漏掉缺字。"""
+        size = max(8, min(500, int(size)))
+        candidates = ([font_filename] if font_filename else []) + [
+            name for name in self._available_font_names() if name != font_filename
+        ]
+        for name in candidates:
+            try:
+                font = ImageFont.truetype(os.path.join(self.fonts_dir, name), size)
+                if all(self._font_supports_text(font, text) for text in texts):
+                    return name
+            except OSError:
+                continue
+        return font_filename
+
     def _load_text_font(self, font_filename, size, text=""):
         size = max(8, min(500, int(size)))
         if font_filename:

@@ -696,8 +696,8 @@ class Plugin(BasePlugin):
         # 先用全部媒体库名称选出同一款可覆盖所有字符的字体。此前每个库独立
         # fallback，某些名称会切到另一字体，视觉字面高度不同，看起来一大一小。
         batch_input = dict(input or {})
-        all_names = "".join(str(lib.get("Name") or "") for lib in libs)
-        chosen_title_font = self.engine().resolve_font_filename(
+        all_names = [str(lib.get("Name") or "") for lib in libs]
+        chosen_title_font = self.engine().resolve_font_filename_for_texts(
             batch_input.get("fontTitle") or "剑豪体.ttf", all_names, 96
         )
         if chosen_title_font:
