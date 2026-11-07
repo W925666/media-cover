@@ -367,7 +367,7 @@ class Plugin(BasePlugin):
         allowed = (
             "sourceMode", "layout", "fontTitle", "fontSubtitle",
             "badgeStyle", "badgeFont", "badgeSize", "posterCount",
-            "title", "subtitle", "titleColorMode", "titleColor",
+            "title", "subtitle", "titleSize", "subtitleSize", "titleColorMode", "titleColor",
             "subtitleColorMode", "subtitleColor", "badgeColorMode",
             "badgeTextColor", "badgeFollowTextColor",
         )
@@ -601,18 +601,8 @@ class Plugin(BasePlugin):
             config["title_size"] = _parse_size(input.get("titleSize"), 160)
         if input.get("subtitleSize") not in (None, ""):
             config["subtitle_size"] = _parse_size(input.get("subtitleSize"), 80)
-        # 旋转动态最终输出只有 533×300。装饰书法字体在原 140/60 的默认字号下
-        # 会被缩成约 39/17px，媒体库列表里明显偏小；提高设计坐标字号，同时给
-        # 英文副标题更多宽度，避免长分类名称被拆成多行。
-        if layout == "旋转(动态)":
-            if input.get("titleSize") in (None, ""):
-                config["title_size"] = 190
-            if input.get("subtitleSize") in (None, ""):
-                config["subtitle_size"] = 66
-            config["title_pos_y"] = 34
-            config["subtitle_pos_y"] = 58
-            config["title_width_pct"] = 46
-            config["sub_width_pct"] = 50
+        # 用户未设置字号时严格保留各 FrameBase 布局原版默认值；仅在页面明确
+        # 输入字号时覆盖。长名称由公共换行逻辑处理，不再偷偷放大标题。
         # 自由设计依赖画布元素。简化页面不提供设计器时，使用可见的通用构图，
         # 而不是只输出一张空色背景。
         if layout == "自由设计" and not config.get("designer_elements"):
@@ -940,6 +930,8 @@ class Plugin(BasePlugin):
             "posterCount": 9,
             "title": "",
             "subtitle": "",
+            "titleSize": "",
+            "subtitleSize": "",
             "badgeStyle": "box",
             "badgeFont": "剑豪体.ttf",
             "badgeSize": 100,
@@ -1016,6 +1008,8 @@ class Plugin(BasePlugin):
                         "posterCount": ui.ref("state.posterCount"),
                         "title": ui.ref("state.title"),
                         "subtitle": ui.ref("state.subtitle"),
+                        "titleSize": ui.ref("state.titleSize"),
+                        "subtitleSize": ui.ref("state.subtitleSize"),
                         "titleColorMode": ui.ref("state.titleColorMode"),
                         "titleColor": ui.ref("state.titleColor"),
                         "subtitleColorMode": ui.ref("state.subtitleColorMode"),
@@ -1039,6 +1033,8 @@ class Plugin(BasePlugin):
                         "posterCount": ui.ref("state.posterCount"),
                         "title": ui.ref("state.title"),
                         "subtitle": ui.ref("state.subtitle"),
+                        "titleSize": ui.ref("state.titleSize"),
+                        "subtitleSize": ui.ref("state.subtitleSize"),
                         "titleColorMode": ui.ref("state.titleColorMode"),
                         "titleColor": ui.ref("state.titleColor"),
                         "subtitleColorMode": ui.ref("state.subtitleColorMode"),
@@ -1054,6 +1050,8 @@ class Plugin(BasePlugin):
                 ui.Input(label="海报数量（奇数）", bind="state.posterCount", type="number"),
                 ui.Input(label="主标题内容（留空自动）", bind="state.title"),
                 ui.Input(label="副标题内容（留空自动）", bind="state.subtitle"),
+                ui.Input(label="主标题字号（留空使用布局默认）", bind="state.titleSize", type="number"),
+                ui.Input(label="副标题字号（留空使用布局默认）", bind="state.subtitleSize", type="number"),
                 ui.Select(label="主标题颜色模式", bind="state.titleColorMode", options=[
                     {"label": "固定颜色", "value": "solid"},
                     {"label": "动态随机颜色", "value": "random"},
@@ -1073,6 +1071,8 @@ class Plugin(BasePlugin):
                         "posterCount": ui.ref("state.posterCount"),
                         "title": ui.ref("state.title"),
                         "subtitle": ui.ref("state.subtitle"),
+                        "titleSize": ui.ref("state.titleSize"),
+                        "subtitleSize": ui.ref("state.subtitleSize"),
                         "titleColorMode": ui.ref("state.titleColorMode"),
                         "titleColor": ui.ref("state.titleColor"),
                         "subtitleColorMode": ui.ref("state.subtitleColorMode"),
@@ -1126,6 +1126,8 @@ class Plugin(BasePlugin):
                         "posterCount": ui.ref("state.posterCount"),
                         "title": ui.ref("state.title"),
                         "subtitle": ui.ref("state.subtitle"),
+                        "titleSize": ui.ref("state.titleSize"),
+                        "subtitleSize": ui.ref("state.subtitleSize"),
                         "titleColorMode": ui.ref("state.titleColorMode"),
                         "titleColor": ui.ref("state.titleColor"),
                         "subtitleColorMode": ui.ref("state.subtitleColorMode"),
