@@ -693,12 +693,21 @@ class Plugin(BasePlugin):
         if not libs:
             raise ValueError("未读取到媒体库")
         ctx.mt.log(level="info", message=f"开始批量生成，共 {len(libs)} 个媒体库")
+        # 先用全部媒体库名称选出同一款可覆盖所有字符的字体。此前每个库独立
+        # fallback，某些名称会切到另一字体，视觉字面高度不同，看起来一大一小。
+        batch_input = dict(input or {})
+        all_names = "".join(str(lib.get("Name") or "") for lib in libs)
+        chosen_title_font = self.engine().resolve_font_filename(
+            batch_input.get("fontTitle") or "剑豪体.ttf", all_names, 96
+        )
+        if chosen_title_font:
+            batch_input["fontTitle"] = chosen_title_font
         results: list[dict] = []
         for lib in libs:
             entry: dict[str, Any] = {"libraryId": str(lib["Id"]), "library": lib.get("Name") or ""}
             try:
                 one = self.generate_cover({
-                    **(input or {}),
+                    **batch_input,
                     "serverId": server_id,
                     "libraryId": str(lib["Id"]),
                     "upload": True,

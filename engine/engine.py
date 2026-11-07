@@ -169,6 +169,21 @@ class PosterEngine:
         rank = {name: index for index, name in enumerate(preferred)}
         return sorted(names, key=lambda name: (rank.get(name, len(preferred)), name.lower()))
 
+    def resolve_font_filename(self, font_filename, text="", size=64):
+        """为一组文字解析一个统一可用字体，避免批量任务逐库回退到不同字体。"""
+        size = max(8, min(500, int(size)))
+        candidates = ([font_filename] if font_filename else []) + [
+            name for name in self._available_font_names() if name != font_filename
+        ]
+        for name in candidates:
+            try:
+                font = ImageFont.truetype(os.path.join(self.fonts_dir, name), size)
+                if self._font_supports_text(font, text):
+                    return name
+            except OSError:
+                continue
+        return font_filename
+
     def _load_text_font(self, font_filename, size, text=""):
         size = max(8, min(500, int(size)))
         if font_filename:
