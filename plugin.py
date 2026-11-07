@@ -3,7 +3,7 @@
 复用 FrameBase 的 Pillow 封面渲染核心，走 MediaTidy 宿主能力：
 - emby.request    查询媒体库/条目、上传封面（base64）
 - files.*         读取本地授权目录中的素材图片
-- storage         保存预览与配置草稿
+- storage         保存连接配置与生成设置
 
 标题自动取自所选 Emby 条目名；素材图从本地授权目录读取。
 入口：plugin.py:Plugin，继承 mt_plugin.Plugin。
@@ -727,23 +727,6 @@ class Plugin(BasePlugin):
                 else:
                     ctx.mt.log(level="warn", message=f"上传返回 HTTP {resp.get('status')}")
 
-        # 4. 保存预览（宿主 storage 单值上限 256 KiB，完整封面 b64 常超限，
-        #    存一张缩小预览图；失败就跳过，不影响生成结果）
-        try:
-            from io import BytesIO as _BytesIO
-            from PIL import Image as _Image
-            _img = _Image.open(_BytesIO(image_bytes))
-            _img.thumbnail((480, 480))
-            _buf = _BytesIO()
-            _img.convert("RGB").save(_buf, format="JPEG", quality=60)
-            _thumb_b64 = base64.b64encode(_buf.getvalue()).decode("utf-8")
-            if len(_thumb_b64) <= 200 * 1024:
-                ctx.mt.storage.set(key="preview", value={"b64": _thumb_b64, "size": len(_buf.getvalue())})
-            else:
-                ctx.mt.log(level="warn", message="预览图仍超 storage 上限，已跳过保存")
-        except Exception as e:
-            ctx.mt.log(level="warn", message=f"预览保存跳过: {e}")
-
         return result
 
     # ------------------------------------------------------------------ #
@@ -858,11 +841,6 @@ class Plugin(BasePlugin):
         ok = sum(1 for r in results if r["status"] == "uploaded")
         return {"ok": True, "total": len(results), "uploaded": ok,
                 "failed": len(results) - ok, "results": results}
-
-    # ------------------------------------------------------------------ #
-    @query("preview")
-    def preview(self, input: dict, ctx: Context):
-        return _storage_value(ctx.mt.storage.get(key="preview")) or {}
 
     # ------------------------------------------------------------------ #
     @query("templates")
@@ -1140,22 +1118,6 @@ class Plugin(BasePlugin):
                 ui.Text(text="这里保存后，海报数量、自定义主副标题和文字颜色会在刷新页面、重新打开插件及重启后恢复。"),
             ),
             ui.Card(
-                ui.Text(text="最新生成预览。点击生成后自动刷新并显示最新图片。"),
-                ui.Image(
-                    src=ui.expr(
-                        "concat", "data:image/jpeg;base64,",
-                        ui.ref("query.preview.data.b64"),
-                    ),
-                    alt="最新生成封面预览",
-                    visible=ui.expr("gt", ui.expr("length", ui.ref("query.preview.data.b64")), 0),
-                ),
-                ui.EmptyState(
-                    title="还没有生成预览",
-                    description="点击上方生成按钮后会自动显示预览。",
-                    visible=ui.expr("not", ui.expr("gt", ui.expr("length", ui.ref("query.preview.data.b64")), 0)),
-                ),
-            ),
-            ui.Card(
                 ui.Text(text="字体与角标（其他位置、颜色和布局细节均使用所选布局的上游默认值）。"),
                 ui.Select(label="主标题字体", bind="state.fontTitle",
                           options=ui.ref("query.fonts.data")),
@@ -1219,7 +1181,6 @@ class Plugin(BasePlugin):
                 {"id": "servers", "name": "servers"},
                 {"id": "libraries", "name": "libraries"},
                 {"id": "fonts", "name": "fonts"},
-                {"id": "preview", "name": "preview"},
             ],
             state=defaults,
         )
