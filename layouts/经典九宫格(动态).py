@@ -156,18 +156,28 @@ def _draw_text(ctx, canvas, config, fonts):
     safe_margin = max(4, round(16 * design_scale))
     title_x = max(title_x, safe_margin + bar_width + bar_gap)
     bar_right = title_x - bar_gap
-    draw.rectangle(
-        (bar_right - bar_width, title_y, bar_right, title_y + bar_height),
-        fill=accent,
-    )
+    first_line = str(title).splitlines()[0] if title else '国'
+    ink_bbox = title_font.getbbox(first_line)
+    bar_top = title_y + ink_bbox[1]
+    bar_height = max(1, ink_bbox[3] - ink_bbox[1])
     if title:
-        ctx.draw_text_wrapper(
+        draw.rectangle(
+            (bar_right - bar_width, bar_top, bar_right, bar_top + bar_height - 1),
+            fill=accent,
+        )
+    title_bottom = title_y
+    if title:
+        title_bottom = ctx.draw_text_wrapper(
             draw, title, title_x, title_y, title_font, width // 2,
             ctx.resolve_text_fill(config, "title", "#FFFFFF", config.get("title_opacity", 255)),
         )
     if subtitle:
+        subtitle_width = max(1, int(width * 0.34) - subtitle_x)
+        subtitle_font = ctx.fit_single_line_font(subtitle_font, subtitle, subtitle_width)
+        gap = max(2, round(height * 0.018))
+        subtitle_y = max(subtitle_y, title_bottom + gap - subtitle_font.getbbox(subtitle)[1])
         ctx.draw_text_wrapper(
-            draw, subtitle, subtitle_x, subtitle_y, subtitle_font, width // 3,
+            draw, subtitle, subtitle_x, subtitle_y, subtitle_font, subtitle_width,
             ctx.resolve_text_fill(config, "subtitle", "#FFFFFF", config.get("subtitle_opacity", 230)),
         )
     return canvas

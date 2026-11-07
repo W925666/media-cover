@@ -298,6 +298,14 @@ class PosterEngine:
             current_y += font_height
         return current_y
 
+    def fit_single_line_font(self, font, text, max_width):
+        """英文副标题完整保留单行，缩小到可用宽度而非拆断单词。"""
+        size = getattr(font, 'size', 1)
+        while size > 1 and font.getlength(str(text)) > max_width:
+            size -= 1
+            font = font.font_variant(size=size)
+        return font
+
     @staticmethod
     def _rgba(value, opacity=255, fallback='#ffffff'):
         try:

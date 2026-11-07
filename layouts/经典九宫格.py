@@ -261,18 +261,29 @@ def render(ctx, bg, config, assets, fonts):
     bar_height = max(60, int(t_size * 0.65))
     tx = max(tx, 16 + bar_width + bar_gap)
     bar_right = tx - bar_gap
-    draw.rectangle([bar_right - bar_width, ty, bar_right, ty + bar_height], fill=random_color)
+    # Pillow 的 y 是字体起点，汉字墨迹顶部通常在 y 以下几十像素。
+    title_bbox = draw.multiline_textbbox((tx, ty), str(title), font=f_title)
+    bar_top = int(title_bbox[1])
+    bar_height = max(1, f_title.getbbox(str(title).splitlines()[0] if title else '国')[3]
+                     - f_title.getbbox(str(title).splitlines()[0] if title else '国')[1])
+    if title:
+        draw.rectangle([bar_right - bar_width, bar_top, bar_right, bar_top + bar_height - 1], fill=random_color)
     
     title_color = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
     subtitle_color = ctx.resolve_text_fill(config, 'subtitle', '#FFFFFF')
     shadow_color = (0, 0, 0, 100)
     
+    title_bottom = ty
     if title:
         ctx.draw_text_wrapper(draw, title, tx+5, ty+5, f_title, w//2, shadow_color)
-        ctx.draw_text_wrapper(draw, title, tx, ty, f_title, w//2, title_color)
-        
+        title_bottom = ctx.draw_text_wrapper(draw, title, tx, ty, f_title, w//2, title_color)
+
     if subtitle:
-        ctx.draw_text_wrapper(draw, subtitle, sx+3, sy+3, f_sub, w//3, shadow_color)
-        ctx.draw_text_wrapper(draw, subtitle, sx, sy, f_sub, w//3, subtitle_color)
+        subtitle_width = max(1, int(w * 0.34) - sx)
+        f_sub = ctx.fit_single_line_font(f_sub, subtitle, max(1, subtitle_width))
+        gap = max(8, round(h * 0.018))
+        sy = max(sy, title_bottom + gap - f_sub.getbbox(subtitle)[1])
+        ctx.draw_text_wrapper(draw, subtitle, sx+3, sy+3, f_sub, subtitle_width, shadow_color)
+        ctx.draw_text_wrapper(draw, subtitle, sx, sy, f_sub, subtitle_width, subtitle_color)
         
     return bg
