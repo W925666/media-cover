@@ -316,10 +316,13 @@ class PosterEngine:
             index = (int(color_index) * 13 + seed_offset) % len(palette)
             return self._rgba(palette[index], opacity, fallback)
         if mode == 'rainbow':
-            # 同一帧同时显示红橙黄绿青蓝紫离散色带；动态图逐帧轮换色带位置。
-            # 这与 random 的“整段文字只有一种随机色”有明显区别。
+            # 同一帧同时显示红橙黄绿青蓝紫离散色带。同步动态布局传入
+            # frame_rotation_phase，使每个卡片旋转/换图周期内色带完整轮转一圈；
+            # 静态图或普通动态布局仍使用全局帧相位。
             palette = ('#ff1744', '#ff7a00', '#ffd600', '#00e676', '#00d9ff', '#2979ff', '#8e24ff')
-            phase = float(config.get('frame_color_phase', 0.0)) % 1.0
+            phase = float(config.get(
+                'frame_rotation_phase', config.get('frame_color_phase', 0.0)
+            )) % 1.0
             shift = int(phase * len(palette)) % len(palette)
             colors = palette[shift:] + palette[:shift]
             return {
@@ -977,12 +980,14 @@ class PosterEngine:
                 frame_config = dict(dynamic_config)
                 frame_config['frame_color_phase'] = step
                 if uses_synchronized_timeline:
-                    # 与布局 _timeline_state 相同的项目位置：每个 switch_interval
-                    # 开始一次旋转/换图，随机颜色也恰好在此时切换。
+                    # 与布局 _timeline_state 使用同一个项目位置。整数部分代表当前
+                    # 海报，用于随机色切换；小数部分代表本次旋转周期进度，用于
+                    # 彩虹色带在每次旋转期间完整轮转一圈。
+                    item_position = (float(step) % 1.0) * item_count
                     frame_config['frame_color_index'] = min(
-                        max(0, item_count - 1),
-                        int((float(step) % 1.0) * item_count),
+                        max(0, item_count - 1), int(item_position)
                     )
+                    frame_config['frame_rotation_phase'] = item_position % 1.0
                 else:
                     color_interval = max(1, round(
                         max(500, int(config.get('switch_interval', 2500))) / duration
