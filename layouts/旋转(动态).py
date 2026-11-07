@@ -249,12 +249,16 @@ def _draw_text(ctx, canvas, config, fonts):
     title = config.get("title", "")
     subtitle = config.get("subtitle", "")
     shadow_opacity = int(config.get("text_shadow_opacity", 100))
+    # 小尺寸 GIF 中书法字体的彩色笔画容易融入背景，增加轻量描边式阴影，
+    # 保持 FrameBase 构图不变但提高媒体库网格里的可读性。
+    shadow_dx = max(2, round(width / 180))
     if title:
         x = int(width * float(config.get("title_pos_x", 6)) / 100)
         y = int(height * float(config.get("title_pos_y", 38)) / 100)
         max_width = int(width * float(config.get("title_width_pct", 40)) / 100)
         if shadow_opacity > 0:
-            ctx.draw_text_wrapper(draw, title, x + 3, y + 3, title_font, max_width, (0, 0, 0, shadow_opacity))
+            for ox, oy in ((-shadow_dx, 0), (shadow_dx, 0), (0, -shadow_dx), (0, shadow_dx)):
+                ctx.draw_text_wrapper(draw, title, x + ox, y + oy, title_font, max_width, (0, 0, 0, shadow_opacity))
         ctx.draw_text_wrapper(
             draw,
             title,
@@ -269,7 +273,7 @@ def _draw_text(ctx, canvas, config, fonts):
         y = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
         max_width = int(width * float(config.get("sub_width_pct", 40)) / 100)
         if shadow_opacity > 0:
-            ctx.draw_text_wrapper(draw, subtitle, x + 2, y + 2, subtitle_font, max_width, (0, 0, 0, shadow_opacity))
+            ctx.draw_text_wrapper(draw, subtitle, x + shadow_dx, y + shadow_dx, subtitle_font, max_width, (0, 0, 0, shadow_opacity))
         ctx.draw_text_wrapper(
             draw,
             subtitle,

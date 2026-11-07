@@ -432,22 +432,56 @@ class Plugin(BasePlugin):
                 row = rows[0]
                 title = row.get("Name") or ""
                 collection_type = str(row.get("CollectionType") or "").lower()
-                # Emby 只会把国漫、日漫等都归为 tvshows，英文副标题需要先按
-                # 媒体库名称判断内容类别，再回退到 CollectionType。
+                # Emby 会把很多中文媒体库都归为 tvshows，必须先按库名细分。
+                # 规则从更具体的复合名称开始，避免“日韩剧”被“韩剧”子串误判。
                 normalized_name = str(title).strip().lower()
+                exact_subtitles = {
+                    "国漫": "CHINESE ANIMATION",
+                    "儿童": "KIDS & FAMILY",
+                    "日韩剧": "JAPANESE & KOREAN DRAMA",
+                    "综艺剧": "VARIETY SHOWS",
+                    "纪录片": "DOCUMENTARIES",
+                    "短剧": "SHORT DRAMAS",
+                    "华语电影": "CHINESE MOVIES",
+                    "外语电影": "INTERNATIONAL MOVIES",
+                    "动画电影": "ANIMATED MOVIES",
+                    "步兵": "UNCENSORED",
+                    "骑兵": "CENSORED",
+                    "中字": "CHINESE SUBTITLES",
+                    "国产": "CHINESE CONTENT",
+                    "fc2": "FC2 CONTENT",
+                    "欧美": "WESTERN CONTENT",
+                    "糖心vlog&玩偶姐姐": "CREATOR VIDEOS",
+                    "日番": "JAPANESE ANIMATION",
+                    "欧美漫": "WESTERN ANIMATION",
+                    "特摄电影": "TOKUSATSU MOVIES",
+                    "特摄剧": "TOKUSATSU SERIES",
+                    "r级电影": "R-RATED MOVIES",
+                    "日韩电影": "JAPANESE & KOREAN MOVIES",
+                    "欧美剧": "WESTERN TV SERIES",
+                    "港台剧": "HONG KONG & TAIWAN DRAMA",
+                    "记录电影": "DOCUMENTARY FILMS",
+                    "演唱会": "CONCERTS",
+                    "ltx破解": "LTX MEDIA",
+                }
                 name_subtitles = (
-                    (("国漫", "国产动漫", "国产动画"), "CHINESE ANIMATION"),
-                    (("日漫", "日本动漫", "日本动画"), "JAPANESE ANIME"),
+                    (("国产动漫", "国产动画", "国漫"), "CHINESE ANIMATION"),
+                    (("日本动漫", "日本动画", "日漫", "日番"), "JAPANESE ANIMATION"),
+                    (("欧美动漫", "欧美动画", "欧美漫"), "WESTERN ANIMATION"),
+                    (("动画电影",), "ANIMATED MOVIES"),
                     (("动漫", "动画", "anime"), "ANIMATION"),
                     (("国产剧", "国剧", "大陆剧"), "CHINESE DRAMA"),
+                    (("日韩剧",), "JAPANESE & KOREAN DRAMA"),
                     (("韩剧", "韩国剧"), "KOREAN DRAMA"),
                     (("日剧", "日本剧"), "JAPANESE DRAMA"),
-                    (("美剧", "欧美剧", "英剧"), "TV SERIES"),
-                    (("纪录片", "纪录"), "DOCUMENTARY"),
+                    (("美剧", "欧美剧", "英剧"), "WESTERN TV SERIES"),
+                    (("纪录电影", "记录电影"), "DOCUMENTARY FILMS"),
+                    (("纪录片", "纪录"), "DOCUMENTARIES"),
                     (("综艺",), "VARIETY SHOWS"),
+                    (("演唱会",), "CONCERTS"),
                     (("电影",), "MOVIES"),
                 )
-                subtitle = next(
+                subtitle = exact_subtitles.get(normalized_name) or next(
                     (label for keywords, label in name_subtitles
                      if any(keyword in normalized_name for keyword in keywords)),
                     None,
@@ -567,6 +601,18 @@ class Plugin(BasePlugin):
             config["title_size"] = _parse_size(input.get("titleSize"), 160)
         if input.get("subtitleSize") not in (None, ""):
             config["subtitle_size"] = _parse_size(input.get("subtitleSize"), 80)
+        # 旋转动态最终输出只有 533×300。装饰书法字体在原 140/60 的默认字号下
+        # 会被缩成约 39/17px，媒体库列表里明显偏小；提高设计坐标字号，同时给
+        # 英文副标题更多宽度，避免长分类名称被拆成多行。
+        if layout == "旋转(动态)":
+            if input.get("titleSize") in (None, ""):
+                config["title_size"] = 190
+            if input.get("subtitleSize") in (None, ""):
+                config["subtitle_size"] = 72
+            config["title_pos_y"] = 34
+            config["subtitle_pos_y"] = 58
+            config["title_width_pct"] = 46
+            config["sub_width_pct"] = 48
         # 自由设计依赖画布元素。简化页面不提供设计器时，使用可见的通用构图，
         # 而不是只输出一张空色背景。
         if layout == "自由设计" and not config.get("designer_elements"):
