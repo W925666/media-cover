@@ -1019,6 +1019,8 @@ class Plugin(BasePlugin):
                         "badgeFollowTextColor": ui.ref("state.badgeFollowTextColor"),
                         "upload": True,
                     },
+                }, {
+                    "type": "host", "name": "refreshPage",
                 }]),
                 ui.Button(label="🚀 一键生成全部媒体库", onClick=[{
                     "type": "invoke", "actionId": "generate-all",
@@ -1043,6 +1045,8 @@ class Plugin(BasePlugin):
                         "badgeTextColor": ui.ref("state.badgeTextColor"),
                         "badgeFollowTextColor": ui.ref("state.badgeFollowTextColor"),
                     },
+                }, {
+                    "type": "host", "name": "refreshPage",
                 }]),
             ),
             ui.Card(
@@ -1082,7 +1086,7 @@ class Plugin(BasePlugin):
                 ui.Text(text="这里保存后，海报数量、自定义主副标题和文字颜色会在刷新页面、重新打开插件及重启后恢复。"),
             ),
             ui.Card(
-                ui.Text(text="最新生成预览。生成完成后会保存一张轻量预览；点击刷新即可显示最新图片。"),
+                ui.Text(text="最新生成预览。点击生成后自动刷新并显示最新图片。"),
                 ui.Image(
                     src=ui.expr(
                         "concat", "data:image/jpeg;base64,",
@@ -1093,12 +1097,9 @@ class Plugin(BasePlugin):
                 ),
                 ui.EmptyState(
                     title="还没有生成预览",
-                    description="生成封面后点击下方刷新预览。",
+                    description="点击上方生成按钮后会自动显示预览。",
                     visible=ui.expr("not", ui.expr("gt", ui.expr("length", ui.ref("query.preview.data.b64")), 0)),
                 ),
-                ui.Button(label="🔄 刷新生成预览", onClick=[{
-                    "type": "host", "name": "refreshPage",
-                }]),
             ),
             ui.Card(
                 ui.Text(text="字体与角标（其他位置、颜色和布局细节均使用所选布局的上游默认值）。"),
