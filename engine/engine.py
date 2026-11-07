@@ -775,8 +775,41 @@ class PosterEngine:
             # Avoid preloading every library image: a large library can exhaust
             # the worker before frame rendering starts. Images load on demand.
             
-            target_w = 533
+            # 动态帧直接在输出分辨率渲染。此前先以 1920×1080 渲染，再缩到
+            # 533×300；单帧会同时保留背景、布局图层、阴影和缩放副本，低内存
+            # worker 即使单线程也会在第一批帧被 OOM 杀掉。
+            target_w = max(320, min(960, int(config.get('anim_width', 533))))
             target_h = round(target_w * 9 / 16)
+            render_bg = bg.resize((target_w, target_h), Image.LANCZOS)
+            render_scale = target_w / 1920.0
+            dynamic_config = dict(config)
+            for key in (
+                'title_size', 'subtitle_size', 'count_size', 'badge_size',
+                'shadow_blur', 'shadow_offset_x', 'shadow_offset_y',
+                'card_radius', 'layer_offset_x', 'layer_offset_y',
+            ):
+                if key in dynamic_config:
+                    try:
+                        dynamic_config[key] = max(1, round(float(dynamic_config[key]) * render_scale))
+                    except (TypeError, ValueError):
+                        pass
+            dynamic_fonts = {
+                'main': self._load_text_font(
+                    dynamic_config.get('font_title'),
+                    int(dynamic_config.get('title_size', max(1, round(160 * render_scale)))),
+                    dynamic_config.get('title', ''),
+                ),
+                'sub': self._load_text_font(
+                    dynamic_config.get('font_subtitle'),
+                    int(dynamic_config.get('subtitle_size', max(1, round(80 * render_scale)))),
+                    dynamic_config.get('subtitle', ''),
+                ),
+                'count': self._load_text_font(
+                    dynamic_config.get('font_count'),
+                    int(dynamic_config.get('count_size', max(1, round(40 * render_scale)))),
+                    str(assets.get('count', '')),
+                ),
+            }
             duration = max(40, min(500, int(config.get('anim_duration', 100))))
 
             synchronized_dynamic_engines = {
@@ -812,23 +845,28 @@ class PosterEngine:
                     step = idx / (total_frames - 1)
                 else:
                     step = idx / total_frames if total_frames > 1 else 0
-                frame_canvas = bg.copy()
-                
+                frame_canvas = render_bg.copy()
+
                 if engine_type in self.layout_modules:
                     render_func = self.layout_modules[engine_type]
                     try:
-                        final_frame = render_func(self, frame_canvas, config, assets, fonts, step=step)
+                        final_frame = render_func(
+                            self, frame_canvas, dynamic_config, assets, dynamic_fonts, step=step
+                        )
                     except TypeError:
-                        final_frame = render_func(self, frame_canvas, config, assets, fonts)
+                        final_frame = render_func(
+                            self, frame_canvas, dynamic_config, assets, dynamic_fonts
+                        )
                 else:
                     final_frame = frame_canvas
-                
-                count_val = assets.get('count', 0)
-                final_frame = self._draw_badge(final_frame, config, count_val, fonts)
-                resized = final_frame.resize((target_w, target_h), Image.LANCZOS)
-                return idx, resized
 
-            # 动态渲染改为双线程：降低内存峰值，避免 OOM（8 线程会 OOM，1 线程太慢）
+                count_val = assets.get('count', 0)
+                final_frame = self._draw_badge(
+                    final_frame, dynamic_config, count_val, dynamic_fonts
+                )
+                return idx, final_frame
+
+            # 串行生成，避免同时保留多个渲染中的大图层。
             worker_count = 1
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
                 futures = [executor.submit(render_one_frame, i) for i in range(total_frames)]
