@@ -1,0 +1,922 @@
+[
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 1,
+    "layout": "经典九宫格",
+    "font": "Bodoni MT Black.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-01.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 2,
+    "layout": "经典九宫格",
+    "font": "Bookman Old Style Bold.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-02.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 3,
+    "layout": "经典九宫格",
+    "font": "Cooper Black.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-03.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 4,
+    "layout": "经典九宫格",
+    "font": "Elephant Italic.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-04.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 5,
+    "layout": "经典九宫格",
+    "font": "HYZhuanShuF.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-05.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 6,
+    "layout": "经典九宫格",
+    "font": "OPPOSans-B.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-06.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 7,
+    "layout": "经典九宫格",
+    "font": "OPPOSans-H.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-07.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 8,
+    "layout": "经典九宫格",
+    "font": "OPPOSans-L.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-08.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 9,
+    "layout": "经典九宫格",
+    "font": "OPPOSans-M.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-09.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 10,
+    "layout": "经典九宫格",
+    "font": "OPPOSans-R.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-10.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 11,
+    "layout": "经典九宫格",
+    "font": "Rockwell Bold.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-11.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 12,
+    "layout": "经典九宫格",
+    "font": "Sakkal Majalla Bold.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-12.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 13,
+    "layout": "经典九宫格",
+    "font": "Showcard Gothic.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-13.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 14,
+    "layout": "经典九宫格",
+    "font": "Tw Cen MT Bold.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-14.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 15,
+    "layout": "经典九宫格",
+    "font": "仓耳舒圆体W02.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-15.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 16,
+    "layout": "经典九宫格",
+    "font": "优设标题黑.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-16.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 17,
+    "layout": "经典九宫格",
+    "font": "优设鲨鱼菲特健康体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-17.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 18,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-18.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 19,
+    "layout": "经典九宫格",
+    "font": "叶根友毛笔行书.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-19.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 20,
+    "layout": "经典九宫格",
+    "font": "夏日甜心-站酷快乐体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-20.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 21,
+    "layout": "经典九宫格",
+    "font": "字小魂京都和风体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-21.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 22,
+    "layout": "经典九宫格",
+    "font": "字小魂扶摇手书.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-22.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 23,
+    "layout": "经典九宫格",
+    "font": "字魂白鸽天行体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-23.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 24,
+    "layout": "经典九宫格",
+    "font": "料事如神SentyZHAO.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-24.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 25,
+    "layout": "经典九宫格",
+    "font": "方正北魏楷书简体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-25.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 26,
+    "layout": "经典九宫格",
+    "font": "方正字迹-鸿飞汉魏简体.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-26.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 27,
+    "layout": "经典九宫格",
+    "font": "方正行楷_GBK.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-27.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 28,
+    "layout": "经典九宫格",
+    "font": "杨任东竹石体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-28.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 29,
+    "layout": "经典九宫格",
+    "font": "汉仪雪峰体简.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-29.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 30,
+    "layout": "经典九宫格",
+    "font": "港式茶点-新蒂下午茶基本版.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-30.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 31,
+    "layout": "经典九宫格",
+    "font": "熊兔流星体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-31.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 32,
+    "layout": "经典九宫格",
+    "font": "笔精墨妙-书体坊安景臣钢笔行书.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-32.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 33,
+    "layout": "经典九宫格",
+    "font": "胡晓波猛男体.otf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-33.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "font",
+    "idx": 34,
+    "layout": "经典九宫格",
+    "font": "腾祥潮黑简.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "static-font-34.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 1,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "static-badge-01.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 2,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "ribbon",
+    "status": "done",
+    "file": "static-badge-02.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 3,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "circle",
+    "status": "done",
+    "file": "static-badge-03.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 4,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "outline",
+    "status": "done",
+    "file": "static-badge-04.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 5,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "hexagon",
+    "status": "done",
+    "file": "static-badge-05.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 6,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "ticket",
+    "status": "done",
+    "file": "static-badge-06.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 7,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "stamp",
+    "status": "done",
+    "file": "static-badge-07.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 8,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "glitch",
+    "status": "done",
+    "file": "static-badge-08.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 9,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "wave",
+    "status": "done",
+    "file": "static-badge-09.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 10,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "burst",
+    "status": "done",
+    "file": "static-badge-10.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 11,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "tape",
+    "status": "done",
+    "file": "static-badge-11.jpg"
+  },
+  {
+    "kind": "static",
+    "group": "badge",
+    "idx": 12,
+    "layout": "经典九宫格",
+    "font": "剑豪体.ttf",
+    "badge": "split",
+    "status": "done",
+    "file": "static-badge-12.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 1,
+    "layout": "经典九宫格(动态)",
+    "font": "Bodoni MT Black.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-01.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 2,
+    "layout": "经典九宫格(动态)",
+    "font": "Bookman Old Style Bold.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-02.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 3,
+    "layout": "经典九宫格(动态)",
+    "font": "Cooper Black.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-03.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 4,
+    "layout": "经典九宫格(动态)",
+    "font": "Elephant Italic.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-04.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 5,
+    "layout": "经典九宫格(动态)",
+    "font": "HYZhuanShuF.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-05.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 6,
+    "layout": "经典九宫格(动态)",
+    "font": "OPPOSans-B.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-06.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 7,
+    "layout": "经典九宫格(动态)",
+    "font": "OPPOSans-H.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-07.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 8,
+    "layout": "经典九宫格(动态)",
+    "font": "OPPOSans-L.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-08.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 9,
+    "layout": "经典九宫格(动态)",
+    "font": "OPPOSans-M.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-09.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 10,
+    "layout": "经典九宫格(动态)",
+    "font": "OPPOSans-R.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-10.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 11,
+    "layout": "经典九宫格(动态)",
+    "font": "Rockwell Bold.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-11.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 12,
+    "layout": "经典九宫格(动态)",
+    "font": "Sakkal Majalla Bold.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-12.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 13,
+    "layout": "经典九宫格(动态)",
+    "font": "Showcard Gothic.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-13.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 14,
+    "layout": "经典九宫格(动态)",
+    "font": "Tw Cen MT Bold.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-14.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 15,
+    "layout": "经典九宫格(动态)",
+    "font": "仓耳舒圆体W02.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-15.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 16,
+    "layout": "经典九宫格(动态)",
+    "font": "优设标题黑.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-16.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 17,
+    "layout": "经典九宫格(动态)",
+    "font": "优设鲨鱼菲特健康体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-17.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 18,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-18.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 19,
+    "layout": "经典九宫格(动态)",
+    "font": "叶根友毛笔行书.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-19.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 20,
+    "layout": "经典九宫格(动态)",
+    "font": "夏日甜心-站酷快乐体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-20.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 21,
+    "layout": "经典九宫格(动态)",
+    "font": "字小魂京都和风体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-21.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 22,
+    "layout": "经典九宫格(动态)",
+    "font": "字小魂扶摇手书.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-22.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 23,
+    "layout": "经典九宫格(动态)",
+    "font": "字魂白鸽天行体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-23.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 24,
+    "layout": "经典九宫格(动态)",
+    "font": "料事如神SentyZHAO.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-24.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 25,
+    "layout": "经典九宫格(动态)",
+    "font": "方正北魏楷书简体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-25.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 26,
+    "layout": "经典九宫格(动态)",
+    "font": "方正字迹-鸿飞汉魏简体.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-26.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 27,
+    "layout": "经典九宫格(动态)",
+    "font": "方正行楷_GBK.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-27.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 28,
+    "layout": "经典九宫格(动态)",
+    "font": "杨任东竹石体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-28.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 29,
+    "layout": "经典九宫格(动态)",
+    "font": "汉仪雪峰体简.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-29.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 30,
+    "layout": "经典九宫格(动态)",
+    "font": "港式茶点-新蒂下午茶基本版.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-30.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 31,
+    "layout": "经典九宫格(动态)",
+    "font": "熊兔流星体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-31.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 32,
+    "layout": "经典九宫格(动态)",
+    "font": "笔精墨妙-书体坊安景臣钢笔行书.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-32.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 33,
+    "layout": "经典九宫格(动态)",
+    "font": "胡晓波猛男体.otf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-33.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "font",
+    "idx": 34,
+    "layout": "经典九宫格(动态)",
+    "font": "腾祥潮黑简.TTF",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-font-34.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 1,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "box",
+    "status": "done",
+    "file": "dynamic-badge-01.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 2,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "ribbon",
+    "status": "done",
+    "file": "dynamic-badge-02.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 3,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "circle",
+    "status": "done",
+    "file": "dynamic-badge-03.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 4,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "outline",
+    "status": "done",
+    "file": "dynamic-badge-04.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 5,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "hexagon",
+    "status": "done",
+    "file": "dynamic-badge-05.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 6,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "ticket",
+    "status": "done",
+    "file": "dynamic-badge-06.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 7,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "stamp",
+    "status": "done",
+    "file": "dynamic-badge-07.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 8,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "glitch",
+    "status": "done",
+    "file": "dynamic-badge-08.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 9,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "wave",
+    "status": "done",
+    "file": "dynamic-badge-09.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 10,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "burst",
+    "status": "done",
+    "file": "dynamic-badge-10.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 11,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "tape",
+    "status": "done",
+    "file": "dynamic-badge-11.jpg"
+  },
+  {
+    "kind": "dynamic",
+    "group": "badge",
+    "idx": 12,
+    "layout": "经典九宫格(动态)",
+    "font": "剑豪体.ttf",
+    "badge": "split",
+    "status": "done",
+    "file": "dynamic-badge-12.jpg"
+  }
+]
