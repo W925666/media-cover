@@ -807,11 +807,12 @@ class PosterEngine:
         if blur > 0: bg = bg.filter(ImageFilter.GaussianBlur(blur))
         bg = ImageEnhance.Brightness(bg).enhance(float(config.get('brightness', 0.7)))
 
+        title_text_for_font = '' if config.get('force_uniform_title_font') else config.get('title', '')
         fonts = {
             'main': self._load_text_font(
                 config.get('font_title'),
                 int(config.get('title_size', 160)),
-                config.get('title', ''),
+                title_text_for_font,
             ),
             'sub': self._load_text_font(
                 config.get('font_subtitle'),

@@ -548,6 +548,7 @@ class Plugin(BasePlugin):
             "title": input.get("title") or title,
             "subtitle": input.get("subtitle") or subtitle,
             "font_title": input.get("fontTitle") or cfg.get("fontTitle") or config.get("font_title") or "OPPOSans-B.ttf",
+            "force_uniform_title_font": bool(input.get("forceUniformTitleFont")),
             "font_subtitle": input.get("fontSubtitle") or cfg.get("fontSubtitle") or config.get("font_subtitle") or "OPPOSans-B.ttf",
             # 动态布局（文件名含"动态"）开启动画，引擎输出 GIF
             # 容器 worker 内存预算小，帧数必须压低，否则 worker 被 OOM 杀掉
@@ -702,6 +703,7 @@ class Plugin(BasePlugin):
         )
         if chosen_title_font:
             batch_input["fontTitle"] = chosen_title_font
+            batch_input["forceUniformTitleFont"] = True
         results: list[dict] = []
         for lib in libs:
             entry: dict[str, Any] = {"libraryId": str(lib["Id"]), "library": lib.get("Name") or ""}
