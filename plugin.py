@@ -353,8 +353,6 @@ class Plugin(BasePlugin):
         server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
         target_id = str(input.get("targetId")) if input.get("targetId") not in (None, "") else None
         layout = input.get("layout") or "经典九宫格"
-        title_size = _parse_size(input.get("titleSize"), 160)
-        subtitle_size = _parse_size(input.get("subtitleSize"), 80)
         upload = bool(input.get("upload"))
 
         if not server_id:
@@ -492,16 +490,25 @@ class Plugin(BasePlugin):
             # 角标数字 = 媒体库作品总数（不是海报张数）
             "count": library_total or len(poster_paths),
         }
-        # 直接按所选布局和页面参数生成，不依赖预设模板。
+        # 直接按所选布局生成。先读取布局模块自己的 schema 默认值，避免用一套
+        # 全局字号/坐标覆盖所有布局，导致英文副标题折行、标题重叠或画面空白。
         config: dict[str, Any] = {}
+        layout_module = self.engine().layout_modules.get(layout)
+        if layout_module is not None and hasattr(layout_module, "get_schema"):
+            try:
+                for group in layout_module.get_schema() or []:
+                    for item_schema in group.get("items", []) or []:
+                        key = item_schema.get("key")
+                        if key and "default" in item_schema:
+                            config[key] = item_schema["default"]
+            except Exception as e:
+                ctx.mt.log(level="warn", message=f"读取布局默认参数失败：{layout}；{e}")
         config.update({
             "engine": layout,
             "title": input.get("title") or title,
             "subtitle": input.get("subtitle") or subtitle,
             "font_title": input.get("fontTitle") or cfg.get("fontTitle") or config.get("font_title") or "OPPOSans-B.ttf",
             "font_subtitle": input.get("fontSubtitle") or cfg.get("fontSubtitle") or config.get("font_subtitle") or "OPPOSans-B.ttf",
-            "title_size": title_size,
-            "subtitle_size": subtitle_size,
             # 动态布局（文件名含"动态"）开启动画，引擎输出 GIF
             # 容器 worker 内存预算小，帧数必须压低，否则 worker 被 OOM 杀掉
             "enable_animation": "动态" in layout,
@@ -512,6 +519,34 @@ class Plugin(BasePlugin):
             "transition_ms": 900,
             "transition_spin": 38,
         })
+        # 字号仅在调用方明确填写时覆盖；默认由每个布局自己的 schema 决定。
+        if input.get("titleSize") not in (None, ""):
+            config["title_size"] = _parse_size(input.get("titleSize"), 160)
+        if input.get("subtitleSize") not in (None, ""):
+            config["subtitle_size"] = _parse_size(input.get("subtitleSize"), 80)
+        # 英文副标题较长时限制为布局默认字号的 75%，防止窄文本区按字符
+        # 拆成两三行。用户明确填写 subtitleSize 时尊重自定义值。
+        if input.get("subtitleSize") in (None, "") and len(str(config.get("subtitle") or "")) >= 14:
+            current_subtitle_size = int(config.get("subtitle_size") or 80)
+            config["subtitle_size"] = max(36, round(current_subtitle_size * 0.75))
+        # 自由设计依赖画布元素。简化页面不提供设计器时，使用可见的通用构图，
+        # 而不是只输出一张空色背景。
+        if layout == "自由设计" and not config.get("designer_elements"):
+            config["designer_elements"] = [
+                {"type": "backdrop", "x": 0, "y": 0, "w": 1920, "h": 1080,
+                 "opacity": 100, "fit": "cover"},
+                {"type": "shape", "x": 0, "y": 0, "w": 1920, "h": 1080,
+                 "fill": "#07111c", "opacity": 48},
+                {"type": "poster", "assetIndex": 0, "x": 1110, "y": 120,
+                 "w": 560, "h": 840, "radius": 42, "borderWidth": 5,
+                 "borderColor": "#ffffff"},
+                {"type": "text", "textSource": "title", "x": 145, "y": 350,
+                 "w": 820, "h": 210, "font": config.get("font_title"),
+                 "fontSize": 160, "color": "#ffffff", "align": "left"},
+                {"type": "text", "textSource": "subtitle", "x": 150, "y": 550,
+                 "w": 820, "h": 180, "font": config.get("font_subtitle"),
+                 "fontSize": 64, "color": "#ffffff", "align": "left"},
+            ]
         # 旋转布局：原版 angle_top=0（主卡不转、只有背后模糊卡歪着，看起来没转），
         # 这里把角度调大，主卡肉眼可见地斜着（模板预设带 angle_top=0 也要覆盖）
         if layout == "旋转":
