@@ -254,9 +254,14 @@ def render(ctx, bg, config, assets, fonts):
     sx = int(w * float(config.get('sub_x', 8))/100)
     sy = int(h * float(config.get('sub_y', 58))/100)
     
-    # 颜色装饰块
+    # 颜色装饰块属于中文主标题，放在主标题左侧并保留安全边距。
     random_color = get_random_bright_color() + (255,)
-    draw.rectangle([sx - 40, sy, sx - 20, sy + s_size * 2], fill=random_color)
+    bar_gap = 20
+    bar_width = 20
+    bar_height = max(60, int(t_size * 0.65))
+    tx = max(tx, 16 + bar_width + bar_gap)
+    bar_right = tx - bar_gap
+    draw.rectangle([bar_right - bar_width, ty, bar_right, ty + bar_height], fill=random_color)
     
     text_color = (255, 255, 255, 255)
     shadow_color = (0, 0, 0, 100)
