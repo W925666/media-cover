@@ -6,6 +6,8 @@ import os
 import re
 import importlib.util
 import math
+import random
+import colorsys
 import threading
 import urllib.request
 
@@ -232,7 +234,25 @@ class PosterEngine:
 
     def resolve_text_fill(self, config, prefix, fallback='#ffffff', opacity=255):
         solid = config.get(f'{prefix}_color', fallback)
-        if config.get(f'{prefix}_color_mode', 'solid') != 'gradient':
+        mode = config.get(f'{prefix}_color_mode', 'solid')
+        if mode == 'random':
+            # 静态图每次生成一种亮色；动态图由 frame_color_phase 驱动逐帧变化。
+            phase = config.get('frame_color_phase')
+            hue = float(phase) % 1.0 if phase is not None else random.random()
+            rgb = colorsys.hsv_to_rgb(hue, 0.78, 1.0)
+            return tuple(round(v * 255) for v in rgb) + (max(0, min(255, int(opacity))),)
+        if mode == 'rainbow':
+            phase = float(config.get('frame_color_phase', 0.0)) % 1.0
+            colors = []
+            for offset in (0.0, 1 / 3, 2 / 3):
+                rgb = colorsys.hsv_to_rgb((phase + offset) % 1.0, 0.88, 1.0)
+                colors.append(tuple(round(v * 255) for v in rgb) + (max(0, min(255, int(opacity))),))
+            return {
+                'colors': colors,
+                'direction': config.get(f'{prefix}_gradient_direction', 'horizontal'),
+                'opacity': max(0, min(255, int(opacity))),
+            }
+        if mode != 'gradient':
             return self._rgba(solid, opacity, fallback)
         return {
             'colors': [
@@ -370,6 +390,10 @@ class PosterEngine:
             except: pass
         if not scaled_font: scaled_font = ImageFont.load_default()
 
+        if config.get('badge_follow_text_color'):
+            config = dict(config)
+            config['badge_text_color_mode'] = config.get('title_color_mode', 'solid')
+            config['badge_text_color'] = config.get('title_color', '#ffffff')
         text_color = config.get('badge_text_color', '#ffffff')
         if style == 'ribbon' and 'badge_text_color' not in config: text_color = '#ffffff'
         bg_hex = config.get('badge_bg_color', '#000000')
@@ -843,23 +867,29 @@ class PosterEngine:
                 else:
                     step = idx / total_frames if total_frames > 1 else 0
                 frame_canvas = render_bg.copy()
+                # 颜色动画使用独立帧配置，避免修改整次任务共享的 dynamic_config。
+                frame_config = dict(dynamic_config)
+                frame_config['frame_color_phase'] = step
+                if frame_config.get('badge_follow_text_color'):
+                    frame_config['badge_text_color_mode'] = frame_config.get('title_color_mode', 'solid')
+                    frame_config['badge_text_color'] = frame_config.get('title_color', '#ffffff')
 
                 if engine_type in self.layout_modules:
                     render_func = self.layout_modules[engine_type]
                     try:
                         final_frame = render_func(
-                            self, frame_canvas, dynamic_config, assets, dynamic_fonts, step=step
+                            self, frame_canvas, frame_config, assets, dynamic_fonts, step=step
                         )
                     except TypeError:
                         final_frame = render_func(
-                            self, frame_canvas, dynamic_config, assets, dynamic_fonts
+                            self, frame_canvas, frame_config, assets, dynamic_fonts
                         )
                 else:
                     final_frame = frame_canvas
 
                 count_val = assets.get('count', 0)
                 final_frame = self._draw_badge(
-                    final_frame, dynamic_config, count_val, dynamic_fonts
+                    final_frame, frame_config, count_val, dynamic_fonts
                 )
                 return idx, final_frame
 

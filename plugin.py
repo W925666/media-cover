@@ -365,7 +365,9 @@ class Plugin(BasePlugin):
         allowed = (
             "sourceMode", "layout", "fontTitle", "fontSubtitle",
             "badgeStyle", "badgeFont", "badgeSize", "posterCount",
-            "title", "subtitle",
+            "title", "subtitle", "titleColorMode", "titleColor",
+            "subtitleColorMode", "subtitleColor", "badgeColorMode",
+            "badgeTextColor", "badgeFollowTextColor",
         )
         saved = {key: input.get(key) for key in allowed if input.get(key) is not None}
         ctx.mt.storage.set(key="ui-settings", value=saved)
@@ -578,8 +580,8 @@ class Plugin(BasePlugin):
         # 引擎对不认识的布局会直接忽略多余键
         _extra_str = [
             "fontTitle", "fontSubtitle", "fontCount",
-            "titleColor", "subtitleColor",
-            "badgeStyle", "badgeFont", "badgeTextColor", "badgeBgColor",
+            "titleColor", "subtitleColor", "titleColorMode", "subtitleColorMode",
+            "badgeStyle", "badgeFont", "badgeTextColor", "badgeBgColor", "badgeTextColorMode",
         ]
         _extra_num = [
             "badgeSize", "badgeXPercent", "badgeYPercent",
@@ -597,6 +599,10 @@ class Plugin(BasePlugin):
                     f"_{c.lower()}" if c.isupper() else c for c in key
                 ).lstrip("_")
                 config[snake] = value
+        badge_mode = input.get("badgeColorMode") or "follow"
+        config["badge_follow_text_color"] = badge_mode == "follow"
+        if badge_mode in ("solid", "random", "rainbow"):
+            config["badge_text_color_mode"] = badge_mode
         for key in _extra_num:
             value = input.get(key)
             if value in (None, ""):
@@ -823,6 +829,13 @@ class Plugin(BasePlugin):
             "badgeStyle": "box",
             "badgeFont": "剑豪体.ttf",
             "badgeSize": 100,
+            "titleColorMode": "solid",
+            "titleColor": "#FFFFFF",
+            "subtitleColorMode": "solid",
+            "subtitleColor": "#FFFFFF",
+            "badgeColorMode": "follow",
+            "badgeTextColor": "#FFFFFF",
+            "badgeFollowTextColor": True,
         }
         if isinstance(saved_ui, dict):
             for key in defaults:
@@ -885,6 +898,13 @@ class Plugin(BasePlugin):
                         "posterCount": ui.ref("state.posterCount"),
                         "title": ui.ref("state.title"),
                         "subtitle": ui.ref("state.subtitle"),
+                        "titleColorMode": ui.ref("state.titleColorMode"),
+                        "titleColor": ui.ref("state.titleColor"),
+                        "subtitleColorMode": ui.ref("state.subtitleColorMode"),
+                        "subtitleColor": ui.ref("state.subtitleColor"),
+                        "badgeColorMode": ui.ref("state.badgeColorMode"),
+                        "badgeTextColor": ui.ref("state.badgeTextColor"),
+                        "badgeFollowTextColor": ui.ref("state.badgeFollowTextColor"),
                         "upload": True,
                     },
                 }]),
@@ -901,6 +921,13 @@ class Plugin(BasePlugin):
                         "posterCount": ui.ref("state.posterCount"),
                         "title": ui.ref("state.title"),
                         "subtitle": ui.ref("state.subtitle"),
+                        "titleColorMode": ui.ref("state.titleColorMode"),
+                        "titleColor": ui.ref("state.titleColor"),
+                        "subtitleColorMode": ui.ref("state.subtitleColorMode"),
+                        "subtitleColor": ui.ref("state.subtitleColor"),
+                        "badgeColorMode": ui.ref("state.badgeColorMode"),
+                        "badgeTextColor": ui.ref("state.badgeTextColor"),
+                        "badgeFollowTextColor": ui.ref("state.badgeFollowTextColor"),
                     },
                 }]),
             ),
@@ -909,6 +936,19 @@ class Plugin(BasePlugin):
                 ui.Input(label="海报数量（奇数）", bind="state.posterCount", type="number"),
                 ui.Input(label="主标题内容（留空自动）", bind="state.title"),
                 ui.Input(label="副标题内容（留空自动）", bind="state.subtitle"),
+                ui.Select(label="主标题颜色模式", bind="state.titleColorMode", options=[
+                    {"label": "固定颜色", "value": "solid"},
+                    {"label": "动态随机颜色", "value": "random"},
+                    {"label": "彩虹渐变", "value": "rainbow"},
+                ]),
+                ui.Input(label="主标题固定颜色（HEX）", bind="state.titleColor"),
+                ui.Select(label="副标题颜色模式", bind="state.subtitleColorMode", options=[
+                    {"label": "固定颜色", "value": "solid"},
+                    {"label": "动态随机颜色", "value": "random"},
+                    {"label": "彩虹渐变", "value": "rainbow"},
+                ]),
+                ui.Input(label="副标题固定颜色（HEX）", bind="state.subtitleColor"),
+                ui.Text(text="动态布局中，随机色和彩虹色会随 GIF 帧平滑变化；静态布局会生成随机亮色或彩虹渐变。"),
             ),
             ui.Card(
                 ui.Text(text="字体与角标（其他位置、颜色和布局细节均使用所选布局的上游默认值）。"),
@@ -934,6 +974,13 @@ class Plugin(BasePlugin):
                 ]),
                 ui.Select(label="徽章字体", bind="state.badgeFont",
                           options=ui.ref("query.fonts.data")),
+                ui.Select(label="徽章文字颜色模式", bind="state.badgeColorMode", options=[
+                    {"label": "跟随主标题颜色", "value": "follow"},
+                    {"label": "固定颜色", "value": "solid"},
+                    {"label": "动态随机颜色", "value": "random"},
+                    {"label": "彩虹渐变", "value": "rainbow"},
+                ]),
+                ui.Input(label="徽章文字固定颜色（HEX）", bind="state.badgeTextColor"),
                 ui.Input(label="徽章大小", bind="state.badgeSize", type="number"),
                 ui.Button(label="💾 保存当前设置", onClick=[{
                     "type": "invoke", "actionId": "save-settings",
@@ -948,6 +995,13 @@ class Plugin(BasePlugin):
                         "posterCount": ui.ref("state.posterCount"),
                         "title": ui.ref("state.title"),
                         "subtitle": ui.ref("state.subtitle"),
+                        "titleColorMode": ui.ref("state.titleColorMode"),
+                        "titleColor": ui.ref("state.titleColor"),
+                        "subtitleColorMode": ui.ref("state.subtitleColorMode"),
+                        "subtitleColor": ui.ref("state.subtitleColor"),
+                        "badgeColorMode": ui.ref("state.badgeColorMode"),
+                        "badgeTextColor": ui.ref("state.badgeTextColor"),
+                        "badgeFollowTextColor": ui.ref("state.badgeFollowTextColor"),
                     },
                 }]),
                 ui.Text(text="保存后刷新页面或下次打开插件时，会自动恢复这些字体、角标和生成设置。"),

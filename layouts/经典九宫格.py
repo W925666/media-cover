@@ -263,15 +263,16 @@ def render(ctx, bg, config, assets, fonts):
     bar_right = tx - bar_gap
     draw.rectangle([bar_right - bar_width, ty, bar_right, ty + bar_height], fill=random_color)
     
-    text_color = (255, 255, 255, 255)
+    title_color = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
+    subtitle_color = ctx.resolve_text_fill(config, 'subtitle', '#FFFFFF')
     shadow_color = (0, 0, 0, 100)
     
     if title:
         ctx.draw_text_wrapper(draw, title, tx+5, ty+5, f_title, w//2, shadow_color)
-        ctx.draw_text_wrapper(draw, title, tx, ty, f_title, w//2, text_color)
+        ctx.draw_text_wrapper(draw, title, tx, ty, f_title, w//2, title_color)
         
     if subtitle:
         ctx.draw_text_wrapper(draw, subtitle, sx+3, sy+3, f_sub, w//3, shadow_color)
-        ctx.draw_text_wrapper(draw, subtitle, sx, sy, f_sub, w//3, text_color)
+        ctx.draw_text_wrapper(draw, subtitle, sx, sy, f_sub, w//3, subtitle_color)
         
     return bg
