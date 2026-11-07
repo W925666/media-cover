@@ -791,7 +791,7 @@ class Plugin(BasePlugin):
         """一键生成页（对齐 cover-studio）：配置一次，之后只点一个按钮。
 
         - Emby 地址/API Key 在插件「配置并启用」时填一次（plugin.json config）
-        - 媒体库列表由 libraries 查询实时经 SDK 读取，无需手动加载
+        - 首次安装时先由 load-libraries 动作读取媒体库并写入缓存
         - 点「一键生成」即自动取海报、合成、上传，无需选条目/选文件/调字号
         """
         return ui.page(
@@ -799,8 +799,13 @@ class Plugin(BasePlugin):
                 ui.Text(text="Cover Studio · 封面创作。默认随机从目标媒体库取背景图和海报。"),
                 ui.Select(label="服务器", bind="state.serverId",
                           options=ui.ref("query.servers.data")),
+                ui.Button(label="加载 / 刷新媒体库", onClick=[{
+                    "type": "invoke", "actionId": "load-libraries",
+                    "input": {"serverId": ui.ref("state.serverId")},
+                }]),
                 ui.Select(label="媒体库", bind="state.libraryId",
                           options=ui.ref("query.libraries.data")),
+                ui.Text(text="首次安装或切换服务器时，请先点“加载 / 刷新媒体库”；加载完成后媒体库下拉框会显示已授权服务器中的媒体库。"),
                 ui.Select(label="取图模式", bind="state.sourceMode", options=[
                     {"label": "随机取图", "value": "random"},
                     {"label": "最新入库", "value": "latest"},
