@@ -369,9 +369,13 @@ class Plugin(BasePlugin):
             "subtitleColorMode", "subtitleColor", "badgeColorMode",
             "badgeTextColor", "badgeFollowTextColor",
         )
-        saved = {key: input.get(key) for key in allowed if input.get(key) is not None}
+        # 支持页面中多个区域分别保存：仅更新这次提交的字段，保留其他已保存项。
+        saved = _storage_value(ctx.mt.storage.get(key="ui-settings")) or {}
+        if not isinstance(saved, dict):
+            saved = {}
+        saved.update({key: input.get(key) for key in allowed if key in input and input.get(key) is not None})
         ctx.mt.storage.set(key="ui-settings", value=saved)
-        ctx.mt.log(level="info", message="字体、角标和生成设置已保存")
+        ctx.mt.log(level="info", message="当前生成设置已保存")
         return {"saved": True, "count": len(saved)}
 
     # ------------------------------------------------------------------ #
@@ -949,6 +953,19 @@ class Plugin(BasePlugin):
                 ]),
                 ui.Input(label="副标题固定颜色（HEX）", bind="state.subtitleColor"),
                 ui.Text(text="动态布局中，随机色和彩虹色会随 GIF 帧平滑变化；静态布局会生成随机亮色或彩虹渐变。"),
+                ui.Button(label="💾 保存资源与标题设置", onClick=[{
+                    "type": "invoke", "actionId": "save-settings",
+                    "input": {
+                        "posterCount": ui.ref("state.posterCount"),
+                        "title": ui.ref("state.title"),
+                        "subtitle": ui.ref("state.subtitle"),
+                        "titleColorMode": ui.ref("state.titleColorMode"),
+                        "titleColor": ui.ref("state.titleColor"),
+                        "subtitleColorMode": ui.ref("state.subtitleColorMode"),
+                        "subtitleColor": ui.ref("state.subtitleColor"),
+                    },
+                }]),
+                ui.Text(text="这里保存后，海报数量、自定义主副标题和文字颜色会在刷新页面、重新打开插件及重启后恢复。"),
             ),
             ui.Card(
                 ui.Text(text="字体与角标（其他位置、颜色和布局细节均使用所选布局的上游默认值）。"),
