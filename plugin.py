@@ -358,6 +358,21 @@ class Plugin(BasePlugin):
         return result
 
     # ------------------------------------------------------------------ #
+    # 动作：保存简化页面的常用设置
+    # ------------------------------------------------------------------ #
+    @action("save-settings")
+    def save_settings(self, input: dict, ctx: Context):
+        allowed = (
+            "sourceMode", "layout", "fontTitle", "fontSubtitle",
+            "badgeStyle", "badgeFont", "badgeSize", "posterCount",
+            "title", "subtitle",
+        )
+        saved = {key: input.get(key) for key in allowed if input.get(key) is not None}
+        ctx.mt.storage.set(key="ui-settings", value=saved)
+        ctx.mt.log(level="info", message="字体、角标和生成设置已保存")
+        return {"saved": True, "count": len(saved)}
+
+    # ------------------------------------------------------------------ #
     # 动作：生成封面并上传到 Emby 条目
     # ------------------------------------------------------------------ #
     @action("generate-cover")
@@ -794,6 +809,25 @@ class Plugin(BasePlugin):
         - 首次安装时先由 load-libraries 动作读取媒体库并写入缓存
         - 点「一键生成」即自动取海报、合成、上传，无需选条目/选文件/调字号
         """
+        saved_ui = _storage_value(ctx.mt.storage.get(key="ui-settings")) or {}
+        defaults = {
+            "serverId": None,
+            "libraryId": None,
+            "sourceMode": "random",
+            "layout": "扇形展开",
+            "fontTitle": "剑豪体.ttf",
+            "fontSubtitle": "剑豪体.ttf",
+            "posterCount": 9,
+            "title": "",
+            "subtitle": "",
+            "badgeStyle": "box",
+            "badgeFont": "剑豪体.ttf",
+            "badgeSize": 100,
+        }
+        if isinstance(saved_ui, dict):
+            for key in defaults:
+                if key in saved_ui and saved_ui[key] is not None:
+                    defaults[key] = saved_ui[key]
         return ui.page(
             ui.Card(
                 ui.Text(text="Cover Studio · 封面创作。默认随机从目标媒体库取背景图和海报。"),
@@ -901,6 +935,22 @@ class Plugin(BasePlugin):
                 ui.Select(label="徽章字体", bind="state.badgeFont",
                           options=ui.ref("query.fonts.data")),
                 ui.Input(label="徽章大小", bind="state.badgeSize", type="number"),
+                ui.Button(label="💾 保存当前设置", onClick=[{
+                    "type": "invoke", "actionId": "save-settings",
+                    "input": {
+                        "sourceMode": ui.ref("state.sourceMode"),
+                        "layout": ui.ref("state.layout"),
+                        "fontTitle": ui.ref("state.fontTitle"),
+                        "fontSubtitle": ui.ref("state.fontSubtitle"),
+                        "badgeStyle": ui.ref("state.badgeStyle"),
+                        "badgeFont": ui.ref("state.badgeFont"),
+                        "badgeSize": ui.ref("state.badgeSize"),
+                        "posterCount": ui.ref("state.posterCount"),
+                        "title": ui.ref("state.title"),
+                        "subtitle": ui.ref("state.subtitle"),
+                    },
+                }]),
+                ui.Text(text="保存后刷新页面或下次打开插件时，会自动恢复这些字体、角标和生成设置。"),
             ),
             ui.RunHistory(),
             ui.RunLog(),
@@ -910,18 +960,5 @@ class Plugin(BasePlugin):
                 {"id": "fonts", "name": "fonts"},
                 {"id": "preview", "name": "preview"},
             ],
-            state={
-                "serverId": None,
-                "libraryId": None,
-                "sourceMode": "random",
-                "layout": "扇形展开",
-                "fontTitle": "剑豪体.ttf",
-                "fontSubtitle": "剑豪体.ttf",
-                "posterCount": 9,
-                "title": "",
-                "subtitle": "",
-                "badgeStyle": "box",
-                "badgeFont": "剑豪体.ttf",
-                "badgeSize": 100,
-            },
+            state=defaults,
         )
