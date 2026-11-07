@@ -229,16 +229,23 @@ class PosterEngine:
     def draw_text_wrapper(self, draw, text, x, y, font, max_width, fill, line_spacing=10, align='left'):
         if not text: return y
         lines = []
-        current_line = ""
-        for char in text:
-            test_line = current_line + char
-            try: w = font.getlength(test_line)
-            except: w = font.getbbox(test_line)[2]
-            if w <= max_width: current_line = test_line
-            else:
-                if current_line: lines.append(current_line)
-                current_line = char
-        if current_line: lines.append(current_line)
+        # 尊重显式换行；其余文本仍按实际字体宽度自动折行。这样所有布局都能
+        # 统一显示长媒体库名，而不是只在某个布局里打补丁。
+        paragraphs = str(text).splitlines() or [str(text)]
+        for paragraph in paragraphs:
+            if not paragraph:
+                lines.append("")
+                continue
+            current_line = ""
+            for char in paragraph:
+                test_line = current_line + char
+                try: w = font.getlength(test_line)
+                except: w = font.getbbox(test_line)[2]
+                if w <= max_width: current_line = test_line
+                else:
+                    if current_line: lines.append(current_line)
+                    current_line = char
+            if current_line: lines.append(current_line)
 
         try: font_height = font.getmetrics()[0] + font.getmetrics()[1] + line_spacing
         except: bbox = font.getbbox("Hg"); font_height = (bbox[3] - bbox[1]) + line_spacing
@@ -799,8 +806,33 @@ class PosterEngine:
         overlay_resized = overlay.resize((w, h), resample=Image.LANCZOS)
         return Image.alpha_composite(img, overlay_resized)
 
+    @staticmethod
+    def _balanced_library_title(text):
+        """将明显过长的库名均衡拆成两行；短库名保持原样。"""
+        value = str(text or '').strip()
+        if not value or '\n' in value:
+            return value
+        visual_length = sum(2 if ord(char) > 127 else 1 for char in value)
+        if visual_length <= 10:
+            return value
+        candidate_indices = [
+            index for index in range(1, len(value))
+            if value[index - 1] in ' &/-_' or value[index] in ' &/-_'
+        ] or list(range(1, len(value)))
+        split_at = min(
+            candidate_indices,
+            key=lambda index: abs(
+                sum(2 if ord(char) > 127 else 1 for char in value[:index])
+                - sum(2 if ord(char) > 127 else 1 for char in value[index:])
+            ),
+        )
+        return value[:split_at].strip() + '\n' + value[split_at:].strip()
+
     # === 动态 GIF 生成 ===
     def draw(self, config, assets):
+        config = dict(config)
+        if config.get('auto_wrap_library_title', True):
+            config['title'] = self._balanced_library_title(config.get('title', ''))
         bg = None
         if assets.get('bg_url'):
             bg = self.download_img(assets['bg_url'])

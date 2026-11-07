@@ -274,7 +274,7 @@ def _draw_text(ctx, canvas, config, fonts):
         x = int(width * float(config.get("title_pos_x", 6)) / 100)
         y = int(height * float(config.get("title_pos_y", 38)) / 100)
         max_width = int(width * float(config.get("title_width_pct", 40)) / 100)
-        title_lines = _balanced_title_lines(title)
+        title_lines = str(title).splitlines() or [str(title)]
         if len(title_lines) > 1:
             # 两行标题从原中心向上下展开，避免向下挤压英文副标题。
             try:
