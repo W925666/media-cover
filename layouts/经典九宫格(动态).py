@@ -56,7 +56,8 @@ def _background(ctx, fallback, config, pair):
 
 
 def _add_shadow(image, blur_radius, shadow_opacity):
-    offset = (15, 15)
+    offset_value = max(2, blur_radius)
+    offset = (offset_value, offset_value)
     width, height = image.size
     shadow_width = width + abs(offset[0]) + blur_radius * 2
     shadow_height = height + abs(offset[1]) + blur_radius * 2
@@ -79,16 +80,20 @@ def _add_shadow(image, blur_radius, shadow_opacity):
 
 
 def _draw_grid(ctx, canvas, config, pairs, tick, progress, direction):
-    cell_width = int(config.get("cell_width", 410))
-    cell_height = int(config.get("cell_height", 610))
-    radius = int(config.get("corner_radius", 46))
+    # 布局预设以 1920×1080 为设计坐标；动态 GIF 直接在最终尺寸渲染，
+    # 因而所有像素尺寸和坐标都要同步缩放。旧逻辑在 533×300 画布仍使用
+    # 410×610 卡片和 start_x=603，导致九宫格几乎整体落在画布外。
+    design_scale = canvas.width / 1920.0
+    cell_width = max(1, int(float(config.get("cell_width", 410)) * design_scale))
+    cell_height = max(1, int(float(config.get("cell_height", 610)) * design_scale))
+    radius = max(0, int(float(config.get("corner_radius", 46)) * design_scale))
     rotation = float(config.get("rotation", -16))
-    start_x = int(config.get("start_x", 350))
-    start_y = int(config.get("start_y", -200))
-    column_gap = int(config.get("col_spacing", 50))
-    row_gap = int(config.get("row_spacing", 22))
-    column_lift = int(config.get("column_lift", -80))
-    shadow_blur = int(config.get("shadow_blur", 15))
+    start_x = int(float(config.get("start_x", 350)) * design_scale)
+    start_y = int(float(config.get("start_y", -200)) * design_scale)
+    column_gap = int(float(config.get("col_spacing", 50)) * design_scale)
+    row_gap = int(float(config.get("row_spacing", 22)) * design_scale)
+    column_lift = int(float(config.get("column_lift", -80)) * design_scale)
+    shadow_blur = max(0, int(config.get("shadow_blur", 15)))
     shadow_opacity = int(config.get("shadow_opacity", 180))
 
     card_cache = {}
@@ -107,7 +112,8 @@ def _draw_grid(ctx, canvas, config, pairs, tick, progress, direction):
     if not card_cache:
         return Image.alpha_composite(canvas, stage)
     sample = next(iter(card_cache.values()))
-    row_step = sample.height - 30
+    row_overlap = max(1, int(30 * design_scale))
+    row_step = sample.height - row_overlap
     index_step = -1 if direction == "diagonal_down" else 1
     travel = row_step * progress * (1 if direction == "diagonal_down" else -1)
     rows = range(-1, 3) if direction == "diagonal_down" else range(0, 4)
@@ -124,7 +130,7 @@ def _draw_grid(ctx, canvas, config, pairs, tick, progress, direction):
                 continue
             column_canvas.alpha_composite(card, (0, round(row * row_step + travel)))
         rotated_column = column_canvas.rotate(rotation, resample=Image.BICUBIC, expand=True)
-        x = start_x + column * (cell_width - 50 + column_gap)
+        x = start_x + column * (cell_width - int(50 * design_scale) + column_gap)
         y = start_y + column * column_lift
         stage.alpha_composite(rotated_column, (round(x), round(y)))
     return Image.alpha_composite(canvas, stage)

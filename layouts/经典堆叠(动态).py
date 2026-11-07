@@ -60,16 +60,21 @@ def _draw_stack(ctx, canvas, config, pairs, active_index):
         return canvas
 
     width, height = canvas.size
+    # 动态 GIF 会直接按最终尺寸（默认 533×300）渲染。这里的尺寸参数来自
+    # FrameBase 的 1920×1080 预设，必须随画布等比缩放，否则海报会比画布还高、
+    # 堆叠间距也会把后排海报全部推出画面。
+    design_scale = width / 1920.0
     scale = float(config.get('poster_scale', 0.9))
-    front_h, front_w = int(550 * scale), int(366 * scale)
+    front_h = max(1, int(550 * scale * design_scale))
+    front_w = max(1, int(366 * scale * design_scale))
     anchor_x = int(width * (float(config.get('poster_x_percent', 55)) / 100))
     anchor_y = int(height * (float(config.get('poster_y_percent', 50)) / 100))
-    offset_step = int(config.get('poster_gap', 140) * scale)
-    radius = int(config.get('poster_radius', 20))
+    offset_step = int(float(config.get('poster_gap', 140)) * scale * design_scale)
+    radius = max(0, int(float(config.get('poster_radius', 20)) * design_scale))
     poster_brightness = float(config.get('poster_brightness', 1.0))
     shadow_opacity = int(config.get('poster_shadow_opacity', 160))
-    shadow_blur = int(config.get('shadow_blur', 15))
-    shadow_offset = int(config.get('shadow_offset', 10))
+    shadow_blur = max(0, int(config.get('shadow_blur', 15)))
+    shadow_offset = int(float(config.get('shadow_offset', 10)) * design_scale)
 
     for depth in range(len(poster_urls) - 1, -1, -1):
         poster = ctx.download_img(poster_urls[depth])
@@ -97,8 +102,9 @@ def _draw_stack(ctx, canvas, config, pairs, active_index):
         layer.alpha_composite(shadow)
         layer.alpha_composite(poster, (margin, margin))
 
-        pos_x = anchor_x + depth * offset_step - margin
-        pos_y = anchor_y + (front_h - target_h) // 2 - margin
+        # 预设中的锚点表示首张海报中心，而不是左上角。
+        pos_x = anchor_x - front_w // 2 + depth * offset_step - margin
+        pos_y = anchor_y - front_h // 2 + (front_h - target_h) // 2 - margin
         if pos_x < width + 200:
             canvas.alpha_composite(layer, (pos_x, pos_y))
     return canvas
