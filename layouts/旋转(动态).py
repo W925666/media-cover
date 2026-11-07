@@ -270,11 +270,15 @@ def _draw_text(ctx, canvas, config, fonts):
     # 小尺寸 GIF 中书法字体的彩色笔画容易融入背景，增加轻量描边式阴影，
     # 保持 FrameBase 构图不变但提高媒体库网格里的可读性。
     shadow_dx = max(2, round(width / 180))
+    title_bottom = 0
     if title:
         x = int(width * float(config.get("title_pos_x", 6)) / 100)
         y = int(height * float(config.get("title_pos_y", 38)) / 100)
         max_width = int(width * float(config.get("title_width_pct", 40)) / 100)
         title_lines = str(title).splitlines() or [str(title)]
+        # 最多保留两行，避免异常超长名称持续向下侵占副标题区域。
+        if len(title_lines) > 2:
+            title_lines = [title_lines[0], " ".join(title_lines[1:])]
         if len(title_lines) > 1:
             # 两行标题从原中心向上下展开，避免向下挤压英文副标题。
             try:
@@ -295,13 +299,27 @@ def _draw_text(ctx, canvas, config, fonts):
                         draw, title_line, x + ox, line_y + oy, title_font,
                         max_width, (0, 0, 0, shadow_opacity), line_spacing=0,
                     )
-            ctx.draw_text_wrapper(
-                draw, title_line, x, line_y, title_font, max_width,
-                title_fill, line_spacing=0,
+            title_bottom = max(
+                title_bottom,
+                ctx.draw_text_wrapper(
+                    draw, title_line, x, line_y, title_font, max_width,
+                    title_fill, line_spacing=0,
+                ),
             )
     if subtitle:
         x = int(width * float(config.get("subtitle_pos_x", 6)) / 100)
-        y = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
+        configured_y = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
+        # 两行或自动折行后的标题必须把副标题整体下移。旧逻辑只把标题向上
+        # 展开，却仍在固定55%位置画副标题，导致英文压进第二行或被遮挡。
+        try:
+            sub_ascent, sub_descent = subtitle_font.getmetrics()
+            subtitle_line_height = sub_ascent + sub_descent
+        except Exception:
+            subtitle_bbox = subtitle_font.getbbox("Ag")
+            subtitle_line_height = subtitle_bbox[3] - subtitle_bbox[1]
+        gap = max(4, round(subtitle_line_height * 0.28))
+        y = max(configured_y, title_bottom + gap) if title_bottom else configured_y
+        y = min(y, max(0, height - subtitle_line_height - gap))
         max_width = int(width * float(config.get("sub_width_pct", 40)) / 100)
         if shadow_opacity > 0:
             ctx.draw_text_wrapper(draw, subtitle, x + shadow_dx, y + shadow_dx, subtitle_font, max_width, (0, 0, 0, shadow_opacity))
