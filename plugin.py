@@ -71,7 +71,15 @@ class EmbyDirect:
     """
 
     def __init__(self, base_url: str, api_key: str, timeout: int = 25):
-        self.base = (base_url or "").rstrip("/")
+        base = (base_url or "").strip().rstrip("/")
+        # 兼容历史配置里常见的 http:IP:PORT / https:IP:PORT 写法。
+        if base.startswith("http:") and not base.startswith("http://"):
+            base = "http://" + base[5:].lstrip("/")
+        elif base.startswith("https:") and not base.startswith("https://"):
+            base = "https://" + base[6:].lstrip("/")
+        elif base and "://" not in base:
+            base = "http://" + base
+        self.base = base
         self.key = (api_key or "").strip()
         self.timeout = timeout
 
