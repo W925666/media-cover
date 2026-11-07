@@ -167,7 +167,7 @@ python3 tests/test_engine.py
 ## 当前版本
 
 ```text
-0.3.1
+0.3.2
 ```
 
 已在真实 MediaTidy + Emby 环境验证：
