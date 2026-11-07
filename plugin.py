@@ -1096,7 +1096,9 @@ class Plugin(BasePlugin):
                     description="生成封面后点击下方刷新预览。",
                     visible=ui.expr("not", ui.expr("gt", ui.expr("length", ui.ref("query.preview.data.b64")), 0)),
                 ),
-                ui.Button(label="🔄 刷新生成预览", onClick=[{"type": "refreshPage"}]),
+                ui.Button(label="🔄 刷新生成预览", onClick=[{
+                    "type": "host", "action": "refreshPage",
+                }]),
             ),
             ui.Card(
                 ui.Text(text="字体与角标（其他位置、颜色和布局细节均使用所选布局的上游默认值）。"),
