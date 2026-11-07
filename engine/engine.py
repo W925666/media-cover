@@ -252,17 +252,6 @@ class PosterEngine:
             hue = rainbow_hues[int(phase * len(rainbow_hues)) % len(rainbow_hues)]
             rgb = colorsys.hsv_to_rgb(hue, 0.90, 1.0)
             return tuple(round(v * 255) for v in rgb) + (max(0, min(255, int(opacity))),)
-        if mode == 'rainbow_gradient':
-            phase = float(config.get('frame_color_phase', 0.0)) % 1.0
-            colors = []
-            for offset in (0.0, 1 / 3, 2 / 3):
-                rgb = colorsys.hsv_to_rgb((phase + offset) % 1.0, 0.88, 1.0)
-                colors.append(tuple(round(v * 255) for v in rgb) + (max(0, min(255, int(opacity))),))
-            return {
-                'colors': colors,
-                'direction': config.get(f'{prefix}_gradient_direction', 'horizontal'),
-                'opacity': max(0, min(255, int(opacity))),
-            }
         if mode != 'gradient':
             return self._rgba(solid, opacity, fallback)
         return {

@@ -605,7 +605,7 @@ class Plugin(BasePlugin):
                 config[snake] = value
         badge_mode = input.get("badgeColorMode") or "follow"
         config["badge_follow_text_color"] = badge_mode == "follow"
-        if badge_mode in ("solid", "random", "rainbow", "rainbow_gradient"):
+        if badge_mode in ("solid", "random", "rainbow"):
             config["badge_text_color_mode"] = badge_mode
         for key in _extra_num:
             value = input.get(key)
@@ -845,6 +845,10 @@ class Plugin(BasePlugin):
             for key in defaults:
                 if key in saved_ui and saved_ui[key] is not None:
                     defaults[key] = saved_ui[key]
+        # 0.4.2 曾提供 rainbow_gradient，现统一迁移成用户确认保留的彩虹闪烁。
+        for key in ("titleColorMode", "subtitleColorMode", "badgeColorMode"):
+            if defaults.get(key) == "rainbow_gradient":
+                defaults[key] = "rainbow"
         return ui.page(
             ui.Card(
                 ui.Text(text="Cover Studio · 封面创作。默认随机从目标媒体库取背景图和海报。"),
@@ -944,17 +948,15 @@ class Plugin(BasePlugin):
                     {"label": "固定颜色", "value": "solid"},
                     {"label": "动态随机颜色", "value": "random"},
                     {"label": "彩虹闪烁", "value": "rainbow"},
-                    {"label": "彩虹渐变", "value": "rainbow_gradient"},
                 ]),
                 ui.Input(label="主标题固定颜色（HEX）", bind="state.titleColor"),
                 ui.Select(label="副标题颜色模式", bind="state.subtitleColorMode", options=[
                     {"label": "固定颜色", "value": "solid"},
                     {"label": "动态随机颜色", "value": "random"},
                     {"label": "彩虹闪烁", "value": "rainbow"},
-                    {"label": "彩虹渐变", "value": "rainbow_gradient"},
                 ]),
                 ui.Input(label="副标题固定颜色（HEX）", bind="state.subtitleColor"),
-                ui.Text(text="彩虹闪烁：整段文字按红橙黄绿青蓝紫逐色闪动；彩虹渐变：同一行文字内部同时显示多种颜色并流动。"),
+                ui.Text(text="彩虹闪烁：整段文字按红橙黄绿青蓝紫逐色闪动，角标选择跟随主标题后会同步闪烁。"),
                 ui.Button(label="💾 保存资源与标题设置", onClick=[{
                     "type": "invoke", "actionId": "save-settings",
                     "input": {
@@ -998,7 +1000,6 @@ class Plugin(BasePlugin):
                     {"label": "固定颜色", "value": "solid"},
                     {"label": "动态随机颜色", "value": "random"},
                     {"label": "彩虹闪烁", "value": "rainbow"},
-                    {"label": "彩虹渐变", "value": "rainbow_gradient"},
                 ]),
                 ui.Input(label="徽章文字固定颜色（HEX）", bind="state.badgeTextColor"),
                 ui.Input(label="徽章大小", bind="state.badgeSize", type="number"),
