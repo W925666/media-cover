@@ -297,15 +297,24 @@ class PosterEngine:
         solid = config.get(f'{prefix}_color', fallback)
         mode = config.get(f'{prefix}_color_mode', 'solid')
         if mode == 'random':
-            # 静态图每次生成一种亮色；动态图按时间片跳到新的随机亮色。
-            phase = config.get('frame_color_phase')
-            if phase is None:
-                hue = random.random()
-            else:
-                color_step = int(float(phase) * 12)
-                hue = (color_step * 0.61803398875 + 0.137) % 1.0
-            rgb = colorsys.hsv_to_rgb(hue, 0.78, 1.0)
-            return tuple(round(v * 255) for v in rgb) + (max(0, min(255, int(opacity))),)
+            # 静态图每次生成一种亮色。动态图的颜色编号由引擎按海报切换周期
+            # 计算：卡片每旋转/换图一次，文字同时换一种颜色，而不是按总帧进度
+            # 任意切 12 段。24 色固定高区分度调色板避免颜色种类偏少。
+            palette = (
+                '#ff1744', '#ff5252', '#ff6d00', '#ff9100',
+                '#ffc400', '#ffea00', '#aeea00', '#64dd17',
+                '#00c853', '#00bfa5', '#00b8d4', '#00e5ff',
+                '#0091ea', '#2962ff', '#304ffe', '#6200ea',
+                '#7c4dff', '#aa00ff', '#d500f9', '#f50057',
+                '#ff4081', '#00c2ff', '#76ff03', '#ffd740',
+            )
+            color_index = config.get('frame_color_index')
+            if color_index is None:
+                color_index = random.randrange(len(palette))
+            seed_offset = int(config.get('random_color_seed', 7)) % len(palette)
+            # 乘以与24互质的13，连续切换也能跳到色环远端，视觉差异更明显。
+            index = (int(color_index) * 13 + seed_offset) % len(palette)
+            return self._rgba(palette[index], opacity, fallback)
         if mode == 'rainbow':
             # 同一帧同时显示红橙黄绿青蓝紫离散色带；动态图逐帧轮换色带位置。
             # 这与 random 的“整段文字只有一种随机色”有明显区别。
@@ -967,6 +976,18 @@ class PosterEngine:
                 # 颜色动画使用独立帧配置，避免修改整次任务共享的 dynamic_config。
                 frame_config = dict(dynamic_config)
                 frame_config['frame_color_phase'] = step
+                if uses_synchronized_timeline:
+                    # 与布局 _timeline_state 相同的项目位置：每个 switch_interval
+                    # 开始一次旋转/换图，随机颜色也恰好在此时切换。
+                    frame_config['frame_color_index'] = min(
+                        max(0, item_count - 1),
+                        int((float(step) % 1.0) * item_count),
+                    )
+                else:
+                    color_interval = max(1, round(
+                        max(500, int(config.get('switch_interval', 2500))) / duration
+                    ))
+                    frame_config['frame_color_index'] = idx // color_interval
                 if frame_config.get('badge_follow_text_color'):
                     frame_config['badge_text_color_mode'] = frame_config.get('title_color_mode', 'solid')
                     frame_config['badge_text_color'] = frame_config.get('title_color', '#ffffff')
