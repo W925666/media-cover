@@ -165,6 +165,7 @@ class PosterEngine:
         except OSError:
             return []
         preferred = [
+            "NotoSansCJKsc-Bold.otf",
             "OPPOSans-B.ttf",
             "优设标题黑.ttf",
             "仓耳舒圆体W02.ttf",
