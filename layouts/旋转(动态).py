@@ -241,6 +241,24 @@ def _draw_cards(ctx, canvas, config, posters, progress=0.0):
     return Image.alpha_composite(canvas, stage)
 
 
+def _balanced_title_lines(title):
+    """长库名按视觉长度均衡拆成两行，短标题继续保持单行。"""
+    text = str(title or "").strip()
+    if not text:
+        return []
+    visual_length = sum(2 if ord(char) > 127 else 1 for char in text)
+    if visual_length <= 10:
+        return [text]
+    best_index = min(
+        range(1, len(text)),
+        key=lambda index: abs(
+            sum(2 if ord(char) > 127 else 1 for char in text[:index])
+            - sum(2 if ord(char) > 127 else 1 for char in text[index:])
+        ),
+    )
+    return [text[:best_index].strip(), text[best_index:].strip()]
+
+
 def _draw_text(ctx, canvas, config, fonts):
     width, height = canvas.size
     draw = ImageDraw.Draw(canvas)
@@ -256,18 +274,31 @@ def _draw_text(ctx, canvas, config, fonts):
         x = int(width * float(config.get("title_pos_x", 6)) / 100)
         y = int(height * float(config.get("title_pos_y", 38)) / 100)
         max_width = int(width * float(config.get("title_width_pct", 40)) / 100)
-        if shadow_opacity > 0:
-            for ox, oy in ((-shadow_dx, 0), (shadow_dx, 0), (0, -shadow_dx), (0, shadow_dx)):
-                ctx.draw_text_wrapper(draw, title, x + ox, y + oy, title_font, max_width, (0, 0, 0, shadow_opacity))
-        ctx.draw_text_wrapper(
-            draw,
-            title,
-            x,
-            y,
-            title_font,
-            max_width,
-            ctx.resolve_text_fill(config, "title", "#FFFFFF", config.get("title_opacity", 255)),
+        title_lines = _balanced_title_lines(title)
+        if len(title_lines) > 1:
+            # 两行标题从原中心向上下展开，避免向下挤压英文副标题。
+            try:
+                ascent, descent = title_font.getmetrics()
+                line_height = ascent + descent
+            except Exception:
+                bbox = title_font.getbbox("国Hg")
+                line_height = bbox[3] - bbox[1]
+            y -= round(line_height * 0.48)
+        title_fill = ctx.resolve_text_fill(
+            config, "title", "#FFFFFF", config.get("title_opacity", 255)
         )
+        for line_index, title_line in enumerate(title_lines):
+            line_y = y + line_index * line_height if len(title_lines) > 1 else y
+            if shadow_opacity > 0:
+                for ox, oy in ((-shadow_dx, 0), (shadow_dx, 0), (0, -shadow_dx), (0, shadow_dx)):
+                    ctx.draw_text_wrapper(
+                        draw, title_line, x + ox, line_y + oy, title_font,
+                        max_width, (0, 0, 0, shadow_opacity), line_spacing=0,
+                    )
+            ctx.draw_text_wrapper(
+                draw, title_line, x, line_y, title_font, max_width,
+                title_fill, line_spacing=0,
+            )
     if subtitle:
         x = int(width * float(config.get("subtitle_pos_x", 6)) / 100)
         y = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
