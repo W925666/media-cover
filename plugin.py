@@ -398,7 +398,26 @@ class Plugin(BasePlugin):
                 row = rows[0]
                 title = row.get("Name") or ""
                 collection_type = str(row.get("CollectionType") or "").lower()
-                subtitle = {
+                # Emby 只会把国漫、日漫等都归为 tvshows，英文副标题需要先按
+                # 媒体库名称判断内容类别，再回退到 CollectionType。
+                normalized_name = str(title).strip().lower()
+                name_subtitles = (
+                    (("国漫", "国产动漫", "国产动画"), "CHINESE ANIMATION"),
+                    (("日漫", "日本动漫", "日本动画"), "JAPANESE ANIME"),
+                    (("动漫", "动画", "anime"), "ANIMATION"),
+                    (("国产剧", "国剧", "大陆剧"), "CHINESE DRAMA"),
+                    (("韩剧", "韩国剧"), "KOREAN DRAMA"),
+                    (("日剧", "日本剧"), "JAPANESE DRAMA"),
+                    (("美剧", "欧美剧", "英剧"), "TV SERIES"),
+                    (("纪录片", "纪录"), "DOCUMENTARY"),
+                    (("综艺",), "VARIETY SHOWS"),
+                    (("电影",), "MOVIES"),
+                )
+                subtitle = next(
+                    (label for keywords, label in name_subtitles
+                     if any(keyword in normalized_name for keyword in keywords)),
+                    None,
+                ) or {
                     "movies": "MOVIES",
                     "tvshows": "TV SHOWS",
                     "music": "MUSIC",
