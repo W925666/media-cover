@@ -8,7 +8,6 @@ import importlib.util
 import math
 import threading
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger("cover_factory.engine")
 
@@ -838,8 +837,6 @@ class PosterEngine:
                 user_frames = int(config.get('anim_frames', 30))
                 total_frames = min(user_frames, 300)
             
-            frames_dict = {}
-
             def render_one_frame(idx):
                 if uses_synchronized_timeline and total_frames > 1:
                     step = idx / (total_frames - 1)
@@ -866,72 +863,57 @@ class PosterEngine:
                 )
                 return idx, final_frame
 
-            # 串行生成，避免同时保留多个渲染中的大图层。
-            worker_count = 1
-            with ThreadPoolExecutor(max_workers=worker_count) as executor:
-                futures = [executor.submit(render_one_frame, i) for i in range(total_frames)]
-                for future in as_completed(futures):
-                    try:
-                        idx, img = future.result()
-                        frames_dict[idx] = img
-                    except Exception as e:
-                        print(f"Frame Error: {e}")
-
-            sorted_frames = [frames_dict[i] for i in range(total_frames) if i in frames_dict]
-
-            if sorted_frames:
-                coalesced_frames = []
-                frame_durations = []
-                previous_signature = None
-                for frame in sorted_frames:
-                    signature = frame.resize((32, 18), Image.BILINEAR).tobytes()
+            # MediaTidy Python worker 有独立内存预算：不创建线程池，也不保留
+            # 全部 RGBA 帧。每帧完成后立即量化成 8 位调色板图并释放 RGBA，
+            # 常驻帧内存从 width*height*4 降至约 width*height。
+            gif_frames = []
+            frame_durations = []
+            previous_signature = None
+            previous_rgb = None
+            palette = None
+            for idx in range(total_frames):
+                try:
+                    _, frame = render_one_frame(idx)
+                    rgb = frame.convert('RGB')
+                    signature = rgb.resize((32, 18), Image.BILINEAR).tobytes()
                     is_identical = (
-                        coalesced_frames
+                        previous_rgb is not None
                         and signature == previous_signature
-                        and ImageChops.difference(coalesced_frames[-1], frame).getbbox() is None
+                        and ImageChops.difference(previous_rgb, rgb).getbbox() is None
                     )
                     if is_identical:
                         frame_durations[-1] += duration
                     else:
-                        coalesced_frames.append(frame)
+                        if palette is None:
+                            # 首帧建立统一调色板；后续帧直接映射，不再构建采样图和
+                            # 第二套完整 gif_frames 列表。
+                            palette = rgb.quantize(
+                                colors=256, method=Image.Quantize.MEDIANCUT
+                            )
+                        quantized = rgb.quantize(
+                            palette=palette, dither=Image.Dither.FLOYDSTEINBERG
+                        )
+                        gif_frames.append(quantized)
                         frame_durations.append(duration)
                         previous_signature = signature
+                    previous_rgb = rgb.copy()
+                    del rgb
+                    del frame
+                except Exception as e:
+                    print(f"Frame Error: {e}")
 
-                animation_format = 'gif'
-                if animation_format == 'gif':
-                    sample_count = min(12, len(coalesced_frames))
-                    sample_indices = [round(index * (len(coalesced_frames) - 1) / max(1, sample_count - 1)) for index in range(sample_count)]
-                    palette_sheet = Image.new('RGB', (160 * sample_count, 90))
-                    for index, frame_index in enumerate(sample_indices):
-                        palette_sheet.paste(coalesced_frames[frame_index].convert('RGB').resize((160, 90), Image.LANCZOS), (index * 160, 0))
-                    palette = palette_sheet.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
-                    gif_frames = [
-                        frame.convert('RGB').quantize(palette=palette, dither=Image.Dither.FLOYDSTEINBERG)
-                        for frame in coalesced_frames
-                    ]
-                    gif_frames[0].save(
-                        output,
-                        format='GIF',
-                        save_all=True,
-                        append_images=gif_frames[1:],
-                        duration=frame_durations,
-                        loop=0,
-                        optimize=True,
-                        disposal=2,
-                    )
-                    format_label = 'GIF'
-                else:
-                    coalesced_frames[0].save(
-                        output,
-                        format='PNG',
-                        save_all=True,
-                        append_images=coalesced_frames[1:],
-                        duration=frame_durations,
-                        loop=0,
-                        optimize=False,
-                    )
-                    format_label = 'APNG'
-                print(f">>> [Engine] {format_label} 完成. 帧数: {len(coalesced_frames)}, 大小: {output.getbuffer().nbytes / 1024 / 1024:.2f} MB")
+            if gif_frames:
+                gif_frames[0].save(
+                    output,
+                    format='GIF',
+                    save_all=True,
+                    append_images=gif_frames[1:],
+                    duration=frame_durations,
+                    loop=0,
+                    optimize=False,
+                    disposal=2,
+                )
+                print(f">>> [Engine] GIF 完成. 帧数: {len(gif_frames)}, 大小: {output.getbuffer().nbytes / 1024 / 1024:.2f} MB")
         else:
             # 静态图逻辑，保持高清 1920x1080
             if engine_type in self.layout_modules:
