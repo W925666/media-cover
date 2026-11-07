@@ -63,6 +63,18 @@
       "outputSchema": {}
     },
     {
+      "id": "save-settings",
+      "label": "保存当前设置",
+      "fields": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": true
+      },
+      "outputSchema": {}
+    },
+    {
       "id": "generate-cover",
       "label": "生成封面",
       "fields": [],
