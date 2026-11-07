@@ -299,21 +299,33 @@ class PosterEngine:
         if mode == 'random':
             # 静态图每次生成一种亮色。动态图的颜色编号由引擎按海报切换周期
             # 计算：卡片每旋转/换图一次，文字同时换一种颜色，而不是按总帧进度
-            # 任意切 12 段。24 色固定高区分度调色板避免颜色种类偏少。
+            # 任意切段。48 色高亮调色板覆盖更多色相与明暗层次。
             palette = (
-                '#ff1744', '#ff5252', '#ff6d00', '#ff9100',
-                '#ffc400', '#ffea00', '#aeea00', '#64dd17',
-                '#00c853', '#00bfa5', '#00b8d4', '#00e5ff',
-                '#0091ea', '#2962ff', '#304ffe', '#6200ea',
-                '#7c4dff', '#aa00ff', '#d500f9', '#f50057',
-                '#ff4081', '#00c2ff', '#76ff03', '#ffd740',
+                # 红 / 珊瑚 / 粉
+                '#ff1744', '#ff3d57', '#ff5252', '#ff6b6b',
+                '#ff4081', '#ff5c8a', '#f50057', '#ec407a',
+                # 橙 / 琥珀 / 黄
+                '#ff6d00', '#ff7f11', '#ff9100', '#ffab00',
+                '#ffc400', '#ffd740', '#ffea00', '#fff200',
+                # 黄绿 / 绿色
+                '#c6ff00', '#aeea00', '#76ff03', '#64dd17',
+                '#00e676', '#00c853', '#39ff88', '#00b86b',
+                # 青绿 / 青色
+                '#1de9b6', '#00bfa5', '#00d9c0', '#00e5d4',
+                '#00e5ff', '#00d4ff', '#00b8d4', '#00a6c7',
+                # 蓝 / 靛蓝
+                '#40c4ff', '#00b0ff', '#0091ea', '#2979ff',
+                '#448aff', '#536dfe', '#304ffe', '#3d5afe',
+                # 紫 / 品红
+                '#7c4dff', '#651fff', '#8e24ff', '#aa00ff',
+                '#d500f9', '#e040fb', '#ff00c8', '#ff4de1',
             )
             color_index = config.get('frame_color_index')
             if color_index is None:
                 color_index = random.randrange(len(palette))
             seed_offset = int(config.get('random_color_seed', 7)) % len(palette)
-            # 乘以与24互质的13，连续切换也能跳到色环远端，视觉差异更明显。
-            index = (int(color_index) * 13 + seed_offset) % len(palette)
+            # 乘以与48互质的29，连续切换也能跳到色环远端，视觉差异更明显。
+            index = (int(color_index) * 29 + seed_offset) % len(palette)
             return self._rgba(palette[index], opacity, fallback)
         if mode == 'rainbow':
             # 同一帧同时显示红橙黄绿青蓝紫离散色带。同步动态布局传入
