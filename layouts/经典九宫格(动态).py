@@ -148,7 +148,17 @@ def _draw_text(ctx, canvas, config, fonts):
     subtitle_x = int(width * float(config.get("subtitle_x", 8)) / 100)
     subtitle_y = int(height * float(config.get("subtitle_y", 58)) / 100)
     accent = config.get("accent_color", "#32D6C6")
-    draw.rectangle((subtitle_x - 40, subtitle_y, subtitle_x - 20, subtitle_y + 100), fill=accent)
+    # 装饰竖条原本使用固定 40/20/100 像素，到了 533×300 GIF 仍保持原尺寸，
+    # 因而会被挤到画布左边缘。按当前画布相对 1920 的比例缩放并紧贴副标题。
+    design_scale = width / 1920.0
+    bar_gap = max(4, round(20 * design_scale))
+    bar_width = max(3, round(20 * design_scale))
+    bar_height = max(16, round(100 * design_scale))
+    bar_right = subtitle_x - bar_gap
+    draw.rectangle(
+        (bar_right - bar_width, subtitle_y, bar_right, subtitle_y + bar_height),
+        fill=accent,
+    )
     if title:
         ctx.draw_text_wrapper(
             draw, title, title_x, title_y, title_font, width // 2,
