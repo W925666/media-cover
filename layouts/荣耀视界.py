@@ -407,13 +407,16 @@ def render(ctx, bg, config, assets, fonts):
 
         # --- 副标题 (应用描边参数) ---
         s_str = config.get('subtitle', 'CHINESE MOVIES')
-        s_font = get_font_obj(fonts, config.get('font_subtitle'), int(config.get('subtitle_size', 60)), fallback_key=None)
+        s_font = get_font_obj(fonts, config.get('font_subtitle'), int(config.get('subtitle_size', 60)), fallback_key='sub')
 
         # 获取新添加的描边参数
         s_stroke_w = int(config.get('subtitle_stroke_width', 3))
         s_stroke_c = config.get('subtitle_stroke_color', '#000000')
 
         subtitle_y = int(config.get('subtitle_y', 980))
+        # 特殊单行渐变/字距布局保留原锚点，只在主标题实际高度冲突时下移。
+        if t_str:
+            subtitle_y = max(subtitle_y, t_y + gh + 20)
         subtitle_fill = ctx.resolve_text_fill(config, 'subtitle', '#FFFFFF')
         if isinstance(subtitle_fill, dict):
             ctx.draw_text_wrapper(draw, s_str, center_x, subtitle_y, s_font, bg.width, subtitle_fill, align='center')

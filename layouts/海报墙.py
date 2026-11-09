@@ -140,7 +140,7 @@ def render(ctx, bg, config, assets, fonts):
     title_color = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
 
     if title:
-        ctx.draw_text_wrapper(draw, title, cx, cy_center + title_off, f_title, mw, title_color, align='center')
+        title_end_y = ctx.draw_text_wrapper(draw, title, cx, cy_center + title_off, f_title, mw, title_color, align='center')
 
     # 绘制副标题
     subtitle = config.get('subtitle', '')
@@ -148,6 +148,9 @@ def render(ctx, bg, config, assets, fonts):
     sub_color = ctx.resolve_text_fill(config, 'subtitle', '#CCCCCC')
 
     if subtitle:
-        ctx.draw_text_wrapper(draw, subtitle, cx, cy_center + sub_off, f_sub, mw, sub_color, align='center')
+        subtitle_y = cy_center + sub_off
+        if title:
+            subtitle_y = max(subtitle_y, title_end_y + 10)
+        ctx.draw_text_wrapper(draw, subtitle, cx, subtitle_y, f_sub, mw, sub_color, align='center')
 
     return bg

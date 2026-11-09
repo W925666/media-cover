@@ -255,7 +255,7 @@ def _draw_text(ctx, canvas, config, fonts):
         max_width = int(width * float(config.get("title_width_pct", 40)) / 100)
         if shadow_opacity > 0:
             ctx.draw_text_wrapper(draw, title, x + 3, y + 3, title_font, max_width, (0, 0, 0, shadow_opacity))
-        ctx.draw_text_wrapper(
+        title_end_y = ctx.draw_text_wrapper(
             draw,
             title,
             x,
@@ -267,6 +267,8 @@ def _draw_text(ctx, canvas, config, fonts):
     if subtitle:
         x = int(width * float(config.get("subtitle_pos_x", 6)) / 100)
         y = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
+        if title:
+            y = max(y, title_end_y + 10)
         max_width = int(width * float(config.get("sub_width_pct", 40)) / 100)
         if shadow_opacity > 0:
             ctx.draw_text_wrapper(draw, subtitle, x + 2, y + 2, subtitle_font, max_width, (0, 0, 0, shadow_opacity))

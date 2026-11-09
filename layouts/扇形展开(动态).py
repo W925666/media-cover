@@ -181,7 +181,7 @@ def _draw_text(ctx, canvas, config, fonts):
     title = config.get("title", "")
     subtitle = config.get("subtitle", "")
     if title:
-        ctx.draw_text_wrapper(
+        title_end_y = ctx.draw_text_wrapper(
             draw,
             title,
             width // 2,
@@ -192,11 +192,14 @@ def _draw_text(ctx, canvas, config, fonts):
             align="center",
         )
     if subtitle:
+        subtitle_y = height // 2 + int(config.get("subtitle_offset_y", -171))
+        if title:
+            subtitle_y = max(subtitle_y, title_end_y + 10)
         ctx.draw_text_wrapper(
             draw,
             subtitle,
             width // 2,
-            height // 2 + int(config.get("subtitle_offset_y", -171)),
+            subtitle_y,
             subtitle_font,
             width,
             ctx.resolve_text_fill(config, "subtitle", "#AAAAAA", config.get("subtitle_opacity", 210)),

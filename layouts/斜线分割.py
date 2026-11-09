@@ -273,8 +273,9 @@ def render(ctx, bg, config, assets, fonts):
         # 阴影 (手动绘制多次以模拟柔和阴影)
         for off in range(3, 13, 2):
              ctx.draw_text_wrapper(draw, title, tx+off, ty+off, f_title, tw, c_shadow, align='center')
-        # 正文 (注意：draw_text_wrapper默认可能垂直居中或顶部对齐，这里假设它接受的是(x,y))
-        ctx.draw_text_wrapper(draw, title, tx, ty, f_title, tw, c_title, align='center')
+        # 正文返回包含换行的结束 Y；横向独立锚点保持不变。
+        title_end_y = ctx.draw_text_wrapper(draw, title, tx, ty, f_title, tw, c_title, align='center')
+        sy = max(sy, title_end_y + 10)
 
     # 绘制副标题
     if sub:

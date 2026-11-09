@@ -267,17 +267,44 @@ class PosterEngine:
 
     def draw_text_wrapper(self, draw, text, x, y, font, max_width, fill, line_spacing=10, align='left'):
         if not text: return y
+        # 英文以单词为最小单位，中文仍逐字换行；保留显式换行与空行。
+        # 连字符和撇号属于单词，避免把 Spider-Man / Children's 拆开。
+        paragraphs = [
+            re.findall(r"[A-Za-z0-9_]+(?:['’\-][A-Za-z0-9_]+)*|[^\S\r\n]+|[^\r\n]", paragraph)
+            for paragraph in str(text).replace('\r\n', '\n').replace('\r', '\n').split('\n')
+        ]
+
+        def text_width(value):
+            try:
+                return font.getlength(value)
+            except AttributeError:
+                bbox = font.getbbox(value)
+                return bbox[2] - bbox[0]
+
+        # 尊重调用方字号，不偷偷缩字或拆开英文单词。
+        # 超长词保留完整绘制并记录警告，供预览/调用方决定扩大文本区或减小字号。
+        tokens = [token for paragraph in paragraphs for token in paragraph if not token.isspace()]
+        if tokens and max(text_width(token) for token in tokens) > max_width:
+            logger.warning("文字中的完整单词超出文本区宽度（字号=%s，宽度=%s）：%s",
+                           getattr(font, 'size', None), max_width, str(text))
+
         lines = []
-        current_line = ""
-        for char in text:
-            test_line = current_line + char
-            try: w = font.getlength(test_line)
-            except: w = font.getbbox(test_line)[2]
-            if w <= max_width: current_line = test_line
-            else:
-                if current_line: lines.append(current_line)
-                current_line = char
-        if current_line: lines.append(current_line)
+        for paragraph in paragraphs:
+            current_line = ""
+            pending_space = ""
+            for token in paragraph:
+                if token.isspace():
+                    if current_line:
+                        pending_space += token
+                    continue
+                test_line = current_line + pending_space + token
+                if current_line and text_width(test_line) > max_width:
+                    lines.append(current_line)
+                    current_line = token
+                else:
+                    current_line = test_line
+                pending_space = ""
+            lines.append(current_line)
 
         try: font_height = font.getmetrics()[0] + font.getmetrics()[1] + line_spacing
         except: bbox = font.getbbox("Hg"); font_height = (bbox[3] - bbox[1]) + line_spacing

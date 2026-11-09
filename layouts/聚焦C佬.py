@@ -256,26 +256,14 @@ def render(ctx, bg, config, assets, fonts):
     if base_text_y < 50: base_text_y = 50
     max_w = int(canvas_w * 0.8)
 
-    # 绘制主标题
+    # 使用实际文字结束位置，包含所有换行与字体行高。
+    next_y = base_text_y + int(config.get('title_y_offset', 0))
     if title_str and f_title:
         c_title = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
-        y_offset = int(config.get('title_y_offset', 0))
-        # 居中对齐，返回绘制结束的Y坐标
-        next_y = ctx.draw_text_wrapper(draw, title_str, text_cx, base_text_y + y_offset, f_title, max_w, c_title, align='center')
-
-        # 绘制副标题 (紧接在标题下方)
-        if sub_str:
-            c_sub = ctx.resolve_text_fill(config, 'subtitle', '#AAAAAA')
-            sub_offset = int(config.get('subtitle_offset_y', 20))
-            # 注意：draw_text_wrapper 返回的是文本底部的 Y，所以这里作为起始点
-            # 但原始 draw_text_wrapper 的 y 是中心点还是顶部取决于实现，
-            # 假设 ctx.draw_text_wrapper 的 y 参数是文字中心(center)或顶部(top)，这里做一个简单的相对位移
-            # 为了保险，重新计算副标题位置
-
-            # 使用 title_size 估算高度来叠加
-            title_size = int(config.get('title_size', 140))
-            sub_y = base_text_y + y_offset + title_size + sub_offset
-
-            ctx.draw_text_wrapper(draw, sub_str, text_cx, sub_y, f_sub, max_w, c_sub, align='center')
+        next_y = ctx.draw_text_wrapper(draw, title_str, text_cx, next_y, f_title, max_w, c_title, align='center')
+    if sub_str:
+        c_sub = ctx.resolve_text_fill(config, 'subtitle', '#AAAAAA')
+        sub_y = next_y + max(0, int(config.get('subtitle_offset_y', 20)))
+        ctx.draw_text_wrapper(draw, sub_str, text_cx, sub_y, f_sub, max_w, c_sub, align='center')
 
     return bg

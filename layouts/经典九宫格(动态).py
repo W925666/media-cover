@@ -142,13 +142,16 @@ def _draw_text(ctx, canvas, config, fonts):
     subtitle_x = int(width * float(config.get("subtitle_x", 8)) / 100)
     subtitle_y = int(height * float(config.get("subtitle_y", 58)) / 100)
     accent = config.get("accent_color", "#32D6C6")
-    draw.rectangle((subtitle_x - 40, subtitle_y, subtitle_x - 20, subtitle_y + 100), fill=accent)
     if title:
-        ctx.draw_text_wrapper(
+        title_end_y = ctx.draw_text_wrapper(
             draw, title, title_x, title_y, title_font, width // 2,
             ctx.resolve_text_fill(config, "title", "#FFFFFF", config.get("title_opacity", 255)),
         )
     if subtitle:
+        sub_size = getattr(subtitle_font, "size", int(config.get("subtitle_size", 50)))
+        if title:
+            subtitle_y = max(subtitle_y, title_end_y + max(8, sub_size // 4))
+        draw.rectangle((subtitle_x - 40, subtitle_y, subtitle_x - 20, subtitle_y + sub_size * 2), fill=accent)
         ctx.draw_text_wrapper(
             draw, subtitle, subtitle_x, subtitle_y, subtitle_font, width // 3,
             ctx.resolve_text_fill(config, "subtitle", "#FFFFFF", config.get("subtitle_opacity", 230)),

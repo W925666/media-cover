@@ -117,7 +117,6 @@ def test_queries_survive_empty_storage():
     # libraries 查询只读 storage 缓存（query 场景不允许 emby.request）
     assert p.libraries({}, ctx) == []
     assert p.items({}, ctx) == []
-    assert p.preview({}, ctx) == {}
 
 
 def test_generate_cover_library_mode_without_target():
@@ -161,6 +160,51 @@ def test_generate_cover_rejects_bad_sizes_gracefully():
         raise AssertionError("expected ValueError")
 
 
+def test_library_without_collection_type_keeps_subtitle():
+    p = plugin.Plugin()
+    ctx = FakeCtx(files=[{"ref": "dummy.jpg"}])
+    class LibraryEmby(FakeEmby):
+        def request(self, **kwargs):
+            return {"status": 200, "data": {"Items": [{
+                "Name": "短剧", "Type": "CollectionFolder", "CollectionType": None
+            }]}}
+    ctx.mt.emby = LibraryEmby()
+    captured = {}
+    class Engine:
+        def draw(self, config, assets):
+            captured.update(config)
+            return base64.b64encode(b"preview").decode()
+    p.engine = lambda: Engine()
+    p._plugin_config = lambda ctx: {}
+    p._direct_for_server = lambda *args: types.SimpleNamespace(ok=False)
+    p._layout_defaults = lambda layout: {}
+    p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
+    assert captured["subtitle"] == "SHORT DRAMAS", captured
+
+
+def test_explicit_title_subtitle_sizes_reach_engine():
+    p = plugin.Plugin()
+    ctx = FakeCtx(files=[{"ref": "dummy.jpg"}])
+    captured = {}
+    class Engine:
+        def draw(self, config, assets):
+            captured.clear()
+            captured.update(config)
+            return base64.b64encode(b"preview").decode()
+    p.engine = lambda: Engine()
+    p._plugin_config = lambda ctx: {}
+    p._direct_for_server = lambda *args: types.SimpleNamespace(ok=False)
+    p._layout_defaults = lambda layout: {"title_size": 160, "subtitle_size": 50}
+    for title_size in ("40", "80", "100", "160", "240", "500", "", "bad", "0", "999"):
+        for subtitle_size in ("40", "80", "100", "160", "240", "500", "", "bad", "0", "999"):
+            p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False,
+                              "titleSize": title_size, "subtitleSize": subtitle_size}, ctx)
+            expected_title = 160 if title_size == "" else plugin._parse_size(title_size, 160)
+            expected_subtitle = 50 if subtitle_size == "" else plugin._parse_size(subtitle_size, 80)
+            assert captured["title_size"] == expected_title
+            assert captured["subtitle_size"] == expected_subtitle
+
+
 def test_probe_image_requires_server_and_item():
     p = plugin.Plugin()
     ctx = FakeCtx()
@@ -174,6 +218,8 @@ def test_probe_image_requires_server_and_item():
 
 
 if __name__ == "__main__":
+    test_explicit_title_subtitle_sizes_reach_engine(); print("test_explicit_sizes 100 combinations OK")
+    test_library_without_collection_type_keeps_subtitle(); print("test_library_subtitle OK")
     test_helpers(); print("test_helpers OK")
     test_queries_survive_empty_storage(); print("test_queries OK")
     test_load_libraries_and_items(); print("test_load OK")

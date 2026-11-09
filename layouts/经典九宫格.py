@@ -92,8 +92,8 @@ def get_schema():
                 {"key": "title_size", "label": "标题字号", "type": "range", "min": 50, "max": 300, "default": 160},
                 {"key": "title_x", "label": "标题 X%", "type": "range", "min": 0, "max": 100, "default": 5},
                 {"key": "title_y", "label": "标题 Y%", "type": "range", "min": 0, "max": 100, "default": 40},
-                {"key": "font_sub", "label": "英文副标字体", "type": "font", "default": "default.ttf"},
-                {"key": "sub_size", "label": "副标字号", "type": "range", "min": 20, "max": 150, "default": 50},
+                {"key": "font_subtitle", "label": "英文副标字体", "type": "font", "default": "default.ttf"},
+                {"key": "subtitle_size", "label": "副标字号", "type": "range", "min": 20, "max": 150, "default": 50},
                 {"key": "sub_x", "label": "副标 X%", "type": "range", "min": 0, "max": 100, "default": 8},
                 {"key": "sub_y", "label": "副标 Y%", "type": "range", "min": 0, "max": 100, "default": 58},
             ]
@@ -239,10 +239,10 @@ def render(ctx, bg, config, assets, fonts):
     subtitle = config.get('subtitle', '')
 
     f_title = fonts.get('font_title') or fonts.get('main')
-    f_sub = fonts.get('font_sub') or fonts.get('sub')
+    f_sub = fonts.get('font_subtitle') or fonts.get('sub') or fonts.get('font_sub') or f_title
 
-    t_size = int(config.get('title_size', 160))
-    s_size = int(config.get('sub_size', 50))
+    # 引擎按 subtitle_size 加载，装饰与间距使用实际字号。
+    s_size = getattr(f_sub, 'size', int(config.get('subtitle_size', config.get('sub_size', 50))))
 
     tx = int(w * float(config.get('title_x', 5))/100)
     ty = int(h * float(config.get('title_y', 40))/100)
@@ -250,18 +250,19 @@ def render(ctx, bg, config, assets, fonts):
     sx = int(w * float(config.get('sub_x', 8))/100)
     sy = int(h * float(config.get('sub_y', 58))/100)
 
-    # 颜色装饰块
     random_color = get_random_bright_color() + (255,)
-    draw.rectangle([sx - 40, sy, sx - 20, sy + s_size * 2], fill=random_color)
 
     text_color = (255, 255, 255, 255)
     shadow_color = (0, 0, 0, 100)
 
     if title:
         ctx.draw_text_wrapper(draw, title, tx+5, ty+5, f_title, w//2, shadow_color)
-        ctx.draw_text_wrapper(draw, title, tx, ty, f_title, w//2, text_color)
+        title_bottom = ctx.draw_text_wrapper(draw, title, tx, ty, f_title, w//2, text_color)
+        sy = max(sy, int(title_bottom) + max(8, s_size // 4))
 
     if subtitle:
+        # 多行主标题下面再放副标题和装饰块，避免固定 Y 导致互相穿插。
+        draw.rectangle([sx - 40, sy, sx - 20, sy + s_size * 2], fill=random_color)
         ctx.draw_text_wrapper(draw, subtitle, sx+3, sy+3, f_sub, w//3, shadow_color)
         ctx.draw_text_wrapper(draw, subtitle, sx, sy, f_sub, w//3, text_color)
 

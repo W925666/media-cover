@@ -324,7 +324,8 @@ def render(ctx, bg, config, assets, fonts):
     if title_str:
         if shadow_op > 0:
             ctx.draw_text_wrapper(draw, title_str, tx + 3, ty + 3, f_title_path, mw_title, shadow_color)
-        ctx.draw_text_wrapper(draw, title_str, tx, ty, f_title_path, mw_title, t_color)
+        title_end_y = ctx.draw_text_wrapper(draw, title_str, tx, ty, f_title_path, mw_title, t_color)
+        sy = max(sy, title_end_y + 10)
 
     if subtitle_str:
         if shadow_op > 0:

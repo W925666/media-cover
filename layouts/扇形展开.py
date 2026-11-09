@@ -221,16 +221,17 @@ def render(ctx, bg, config, assets, fonts):
         text_y = (canvas_h // 2) + offset_y
 
         # 居中绘制
-        ctx.draw_text_wrapper(draw, title, canvas_w // 2, text_y, f_title, canvas_w, c_title, align='center')
+        title_end_y = ctx.draw_text_wrapper(draw, title, canvas_w // 2, text_y, f_title, canvas_w, c_title, align='center')
 
     # 绘制副标题
     if subtitle:
         # 使用独立的偏移量 (如果不设置，默认给一个相对位置)
         sub_offset_y = int(config.get('subtitle_offset_y', -200))
 
-        # 如果用户没有特意去调副标题位置（还是默认值），我们可以做一个简单的智能判断
-        # 但为了参数逻辑清晰，这里完全遵从 sub_offset_y，即相对于画面中心
+        # 副标题设定位置作为下界，实际多行主标题需要更多空间时顺延。
         sub_y = (canvas_h // 2) + sub_offset_y
+        if title:
+            sub_y = max(sub_y, title_end_y + 10)
 
         ctx.draw_text_wrapper(draw, subtitle, canvas_w // 2, sub_y, f_sub, canvas_w, c_sub, align='center')
 

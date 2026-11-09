@@ -529,7 +529,12 @@ class Plugin(BasePlugin):
                     "playlists": "PLAYLISTS",
                 }.get(collection_type, "MEDIA LIBRARY")
                 # 普通媒体条目仍用年份；媒体库封面使用媒体库英文类型。
-                if not collection_type:
+                is_library = (
+                    bool(collection_type)
+                    or row.get("Type") in ("CollectionFolder", "UserView")
+                    or target_id == library_id_early
+                )
+                if not is_library:
                     year = row.get("ProductionYear")
                     subtitle = str(year) if year else "MEDIA LIBRARY"
         if not title:
@@ -683,7 +688,11 @@ class Plugin(BasePlugin):
         # 直接使用原版布局排版；明确填写的字体、字号、颜色继续正常生效。
         config['auto_wrap_library_title'] = False
 
-        ctx.mt.log(level="info", message=f"生成封面：标题={title}, 布局={layout}, 素材={len(poster_paths)} 张")
+        ctx.mt.log(level="info", message=(
+            f"生成封面：标题={title}, 布局={layout}, 素材={len(poster_paths)} 张；"
+            f"主标题字号={config.get('title_size', 160)}，"
+            f"副标题字号={config.get('subtitle_size', 80)}（1920×1080 设计尺寸）"
+        ))
         b64 = self.engine().draw(config, assets)
         image_bytes = base64.b64decode(b64)
         ctx.mt.log(level="info", message=f"封面已生成，大小 {len(image_bytes)} 字节")
