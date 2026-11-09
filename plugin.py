@@ -55,16 +55,28 @@ def _parse_size(value: Any, default: int) -> int:
     return max(8, min(500, size))
 
 
-def _library_subtitles(config: dict) -> dict[str, str]:
-    """逐库名称精确映射；异常配置明确报错，防止静默套用全局文字。"""
-    raw = config.get("librarySubtitles") or "{}"
+def _title_map(config: dict) -> dict[str, dict[str, str]]:
+    """与封面工坊相同：显式开启后按 Emby 原名精确匹配。"""
+    if config.get("titleMapEnabled") not in (True, "true", 1):
+        return {}
+    raw = config.get("titleMap") or "{}"
     try:
         mapping = json.loads(raw) if isinstance(raw, str) else raw
     except (ValueError, TypeError) as exc:
-        raise ValueError('逐库副标题对应表需填写 JSON，例如 {"港台剧":"HK SERIES"}') from exc
-    if not isinstance(mapping, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in mapping.items()):
-        raise ValueError("逐库副标题对应表必须是媒体库名称到副标题文字的 JSON 对象")
-    return {k.strip(): v for k, v in mapping.items()}
+        raise ValueError('标题映射表需填写 JSON，例如 {"港台剧":{"title":"","subtitle":"HK SERIES"}}') from exc
+    if not isinstance(mapping, dict):
+        raise ValueError("标题映射表必须是 JSON 对象")
+    for key, entry in mapping.items():
+        if (not isinstance(key, str) or not isinstance(entry, dict)
+                or any(not isinstance(entry.get(field, ""), str) for field in ("title", "subtitle"))):
+            raise ValueError("每条标题映射须为媒体库原名对应 title、subtitle 字符串")
+    return mapping
+
+
+def _resolve_library_titles(config: dict, library_name: str, default_subtitle: str) -> tuple[str, str]:
+    entry = _title_map(config).get(library_name, {})
+    return (entry.get("title", "").strip() or library_name,
+            entry.get("subtitle", "").strip() or default_subtitle)
 
 
 def _storage_value(data: Any) -> Any:
@@ -565,10 +577,11 @@ class Plugin(BasePlugin):
         # 先加载 FrameBase 随布局发布的原版默认预设，再用布局 schema 补齐预设
         # 未声明的键。这样布局、坐标、比例、阴影、模糊与上游默认效果保持一致。
         config: dict[str, Any] = self._layout_defaults(layout)
+        resolved_title, resolved_subtitle = _resolve_library_titles(cfg, title, subtitle)
         config.update({
             "engine": layout,
-            "title": title,
-            "subtitle": _library_subtitles(cfg).get(str(title).strip(), subtitle),
+            "title": resolved_title,
+            "subtitle": resolved_subtitle,
             "font_title": input.get("fontTitle") or cfg.get("fontTitle") or config.get("font_title") or "OPPOSans-B.ttf",
             "force_uniform_title_font": bool(input.get("forceUniformTitleFont")),
             "font_subtitle": input.get("fontSubtitle") or cfg.get("fontSubtitle") or config.get("font_subtitle") or "OPPOSans-B.ttf",
@@ -738,7 +751,7 @@ class Plugin(BasePlugin):
             "VIDEOS", "MUSIC VIDEOS", "PHOTOS", "PLAYLISTS", "MEDIA LIBRARY",
         ]
         # 加入用户可能输入的自定义副标题；没有自定义值时检查全部自动语义文本。
-        custom_subtitles = list(_library_subtitles(self._plugin_config(ctx)).values())
+        custom_subtitles = [entry.get("subtitle", "") for entry in _title_map(self._plugin_config(ctx)).values()]
         subtitle_texts = subtitle_samples + custom_subtitles
         chosen_subtitle_font, subtitle_missing = self.engine().resolve_font_filename_for_texts(
             batch_input.get("fontSubtitle") or batch_input.get("fontTitle") or "OPPOSans-B.ttf",
@@ -1059,7 +1072,7 @@ class Plugin(BasePlugin):
                 }]),
             ),
             ui.Card(
-                ui.Text(text="标题默认使用 Emby 媒体库名称，副标题默认使用类型英文（电影 MOVIES、电视剧 TV SHOWS）。在插件设置的逐库副标题对应表中配置“媒体库名称 → 副标题”，每个媒体库单独匹配；工作台仅调整排版。"),
+                ui.Text(text="标题默认使用 Emby 媒体库名称，副标题默认使用类型英文（电影 MOVIES、电视剧 TV SHOWS）。可在插件设置开启自定义标题，在标题映射表中逐库配置 title 和 subtitle；留空字段使用默认值。工作台仅调整排版。"),
                 ui.Input(label="海报数量（奇数）", bind="state.posterCount", type="number"),
                 *typography_hints,
                 ui.Text(text="主副标题字体默认跟随当前布局；已保存的字体选择优先，选择“跟随当前布局默认字体”可恢复布局原字体。角标字体保留已选值。字号为 1920×1080 设计尺寸，动态输出会按分辨率等比例缩放。"),
@@ -1090,7 +1103,7 @@ class Plugin(BasePlugin):
                         "subtitleColor": ui.ref("state.subtitleColor"),
                     },
                 }]),
-                ui.Text(text="这里保存海报数量、字号和文字颜色；各库副标题请到插件设置的逐库对应表填写。"),
+                ui.Text(text="这里保存海报数量、字号和文字颜色；各库主副标题请到插件设置开启自定义标题并填写标题映射表。"),
             ),
             ui.Card(
                 ui.Text(text="字体与角标（其他位置、颜色和布局细节均使用所选布局的上游默认值）。"),

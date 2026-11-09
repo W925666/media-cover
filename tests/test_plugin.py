@@ -98,6 +98,25 @@ class FakeCtx:
         return ref
 
 
+def test_title_map_switch_defaults_and_validation():
+    mapping = {"港台剧": {"title": "新标题", "subtitle": "HK SERIES"},
+               "电影": {"title": " ", "subtitle": ""}}
+    cfg = {"titleMapEnabled": True, "titleMap": mapping}
+    assert plugin._resolve_library_titles(cfg, "港台剧", "TV SHOWS") == ("新标题", "HK SERIES")
+    assert plugin._resolve_library_titles(cfg, "电影", "MOVIES") == ("电影", "MOVIES")
+    assert plugin._resolve_library_titles(cfg, "未配置", "MOVIES") == ("未配置", "MOVIES")
+    assert plugin._resolve_library_titles(cfg, "港台剧合集", "TV SHOWS") == ("港台剧合集", "TV SHOWS")
+    cfg["titleMapEnabled"] = False
+    assert plugin._resolve_library_titles(cfg, "港台剧", "TV SHOWS") == ("港台剧", "TV SHOWS")
+    for raw in ("broken", "[]", '{"港台剧":"HK SERIES"}', '{"港台剧":{"title":123}}'):
+        try:
+            plugin._title_map({"titleMapEnabled": True, "titleMap": raw})
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(raw)
+
+
 def test_helpers():
     assert plugin._parse_size("160", 160) == 160
     assert plugin._parse_size("abc", 160) == 160
@@ -213,14 +232,15 @@ def test_auto_subtitles_plain_words_and_custom_symbols_preserved():
             assert captured["subtitle"] == expected
             assert captured["title"] == name
     custom = "MY MOVIES & TV | 4K ★"
-    mapping = __import__("json").dumps({current["name"]: custom, "港台剧": "HK SERIES"})
-    p._plugin_config = lambda ctx: {"librarySubtitles": mapping}
+    mapping = __import__("json").dumps({current["name"]: {"title": "", "subtitle": custom}, "港台剧": {"title": "香港台湾剧集", "subtitle": "HK SERIES"}})
+    p._plugin_config = lambda ctx: {"titleMapEnabled": True, "titleMap": mapping}
     p.generate_cover({"serverId": "s1", "libraryId": "17", "subtitle": "旧工作台副标题", "title": "旧工作台标题", "upload": False}, ctx)
     assert captured["subtitle"] == custom
     assert captured["title"] == current["name"]
     current["name"] = "港台剧"
     p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
     assert captured["subtitle"] == "HK SERIES"
+    assert captured["title"] == "香港台湾剧集"
     current["name"] = "未配置的库"
     p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
     assert captured["subtitle"] == "MEDIA LIBRARY"
