@@ -968,7 +968,20 @@ class Plugin(BasePlugin):
                 text=f"{layout_name} · 默认主标题大小：{title_size} px；默认副标题大小：{subtitle_size} px。布局原始字体：主标题 {preset.get('font_title', 'OPPOSans-B.ttf')}，副标题 {preset.get('font_subtitle', 'OPPOSans-B.ttf')}。当前字体以下拉框选择为准；大小留空时使用此值，填写后使用填写值（长文字可能自适应缩小）。",
                 visible=ui.expr('eq', ui.ref('state.layout'), layout_name),
             ))
+        sample_title_map = json.dumps({
+            "港台剧": {"title": "", "subtitle": "HK SERIES"},
+            "动画电影": {"title": "", "subtitle": "ANIMATED MOVIES"},
+        }, ensure_ascii=False, indent=2)
         return ui.page(
+            ui.Card(
+                ui.Text(text="⚙️ 封面标题映射设置", size="lg"),
+                ui.Text(text="一次保存多个媒体库的主副标题，之后单库生成和一键生成都会自动使用。"),
+                ui.Checkbox(label="开启自定义标题", bind="config.titleMapEnabled"),
+                ui.Text(text="按 Emby 媒体库原名精确匹配。title 留空用库名；subtitle 留空用 MOVIES、TV SHOWS 等类型英文。"),
+                ui.Textarea(label="标题映射表（JSON，可同时填写多个库）", bind="config.titleMap", placeholder=sample_title_map),
+                ui.Markdown(text="### 填写示例\n```json\n" + sample_title_map + "\n```\n只列出要修改的库即可，未配置的库使用默认值。使用英文双引号，多条记录之间用英文逗号，最后一条后面不加逗号。\n\n保存前请开启自定义标题。保存后无需重复填写。"),
+                ui.Button(label="💾 保存标题映射设置", onClick=[{"type": "host", "name": "saveConfig"}, {"type": "host", "name": "refreshPage"}]),
+            ),
             ui.Card(
                 ui.Text(text="Cover Studio · 封面创作。默认随机从目标媒体库取背景图和海报。"),
                 ui.Text(text="多台 Emby：先在 MediaTidy 的 Emby 服务器设置中添加服务器，再在本插件授权中勾选它们。下方分别保存每台的连接信息，生成时切换服务器即可。"),
