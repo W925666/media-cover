@@ -179,17 +179,17 @@ def test_library_without_collection_type_keeps_subtitle():
     p._direct_for_server = lambda *args: types.SimpleNamespace(ok=False)
     p._layout_defaults = lambda layout: {}
     p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
-    assert captured["subtitle"] == "SHORT DRAMAS", captured
+    assert captured["subtitle"] == "MEDIA LIBRARY", captured
 
 
 def test_auto_subtitles_plain_words_and_custom_symbols_preserved():
     p = plugin.Plugin()
     ctx = FakeCtx(files=[{"ref": "dummy.jpg"}])
-    current = {"name": "儿童"}
+    current = {"name": "儿童", "type": "tvshows"}
     class LibraryEmby(FakeEmby):
         def request(self, **kwargs):
             return {"status": 200, "data": {"Items": [{
-                "Name": current["name"], "Type": "CollectionFolder", "CollectionType": "tvshows"
+                "Name": current["name"], "Type": "CollectionFolder", "CollectionType": current["type"]
             }]}}
     ctx.mt.emby = LibraryEmby()
     captured = {}
@@ -201,17 +201,17 @@ def test_auto_subtitles_plain_words_and_custom_symbols_preserved():
     p._plugin_config = lambda ctx: {}
     p._direct_for_server = lambda *args: types.SimpleNamespace(ok=False)
     p._layout_defaults = lambda layout: {}
-    cases = {"儿童": "CHILDREN", "日韩剧": "JAPANESE AND KOREAN SERIES",
-             "日韩电影": "JAPANESE AND KOREAN MOVIES",
-             "港台剧": "HONG KONG AND TAIWANESE SERIES", "R级电影": "R RATED MOVIES",
-             "华语电影": "CHINESE LANGUAGE FILMS", "外语电影": "FOREIGN LANGUAGE FILMS",
-             "FC2": "FC2", "国产": "DOMESTIC", "欧美": "EUROPEAN AND AMERICAN",
-             "糖心Vlog&玩偶姐姐": "TANGXIN VLOG AND WANOU JIEJIE", "LTX破解": "LTX CRACKED"}
-    for name, expected in cases.items():
+    for name in ("儿童", "港台剧", "日韩电影", "我的私人影院", "任意库名"):
         current["name"] = name
-        p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
-        assert captured["subtitle"] == expected
-        assert all(c.isalnum() or c.isspace() for c in captured["subtitle"])
+        for kind, expected in {"movies": "MOVIES", "tvshows": "TV SHOWS",
+                               "music": "MUSIC", "boxsets": "COLLECTIONS",
+                               "books": "BOOKS", "homevideos": "VIDEOS",
+                               "musicvideos": "MUSIC VIDEOS", "photos": "PHOTOS",
+                               "playlists": "PLAYLISTS", "": "MEDIA LIBRARY"}.items():
+            current["type"] = kind
+            p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
+            assert captured["subtitle"] == expected
+            assert captured["title"] == name
     custom = "MY MOVIES & TV | 4K ★"
     p.generate_cover({"serverId": "s1", "libraryId": "17", "subtitle": custom, "upload": False}, ctx)
     assert captured["subtitle"] == custom

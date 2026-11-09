@@ -464,61 +464,8 @@ class Plugin(BasePlugin):
                 row = rows[0]
                 title = row.get("Name") or ""
                 collection_type = str(row.get("CollectionType") or "").lower()
-                # Emby 会把很多中文媒体库都归为 tvshows，必须先按库名细分。
-                # 规则从更具体的复合名称开始，避免“日韩剧”被“韩剧”子串误判。
-                normalized_name = str(title).strip().lower()
-                exact_subtitles = {
-                    "国漫": "CHINESE ANIMATION",
-                    "儿童": "CHILDREN",
-                    "日韩剧": "JAPANESE AND KOREAN SERIES",
-                    "综艺剧": "VARIETY SHOWS",
-                    "纪录片": "DOCUMENTARIES",
-                    "短剧": "SHORT DRAMAS",
-                    "华语电影": "CHINESE LANGUAGE FILMS",
-                    "外语电影": "FOREIGN LANGUAGE FILMS",
-                    "动画电影": "ANIMATED MOVIES",
-                    "步兵": "UNCENSORED",
-                    "骑兵": "CENSORED",
-                    "中字": "CHINESE SUBTITLES",
-                    "国产": "DOMESTIC",
-                    "fc2": "FC2",
-                    "欧美": "EUROPEAN AND AMERICAN",
-                    "糖心vlog&玩偶姐姐": "TANGXIN VLOG AND WANOU JIEJIE",
-                    "日番": "JAPANESE ANIMATION",
-                    "欧美漫": "WESTERN ANIMATION",
-                    "特摄电影": "TOKUSATSU MOVIES",
-                    "特摄剧": "TOKUSATSU SERIES",
-                    "r级电影": "R RATED MOVIES",
-                    "日韩电影": "JAPANESE AND KOREAN MOVIES",
-                    "欧美剧": "WESTERN TV SERIES",
-                    "港台剧": "HONG KONG AND TAIWANESE SERIES",
-                    "记录电影": "DOCUMENTARY FILMS",
-                    "演唱会": "CONCERTS",
-                    "ltx破解": "LTX CRACKED",
-                }
-                name_subtitles = (
-                    (("国产动漫", "国产动画", "国漫"), "CHINESE ANIMATION"),
-                    (("日本动漫", "日本动画", "日漫", "日番"), "JAPANESE ANIMATION"),
-                    (("欧美动漫", "欧美动画", "欧美漫"), "WESTERN ANIMATION"),
-                    (("动画电影",), "ANIMATED MOVIES"),
-                    (("动漫", "动画", "anime"), "ANIMATION"),
-                    (("港台剧",), "HONG KONG AND TAIWANESE SERIES"),
-                    (("国产剧", "国剧", "大陆剧"), "CHINESE SERIES"),
-                    (("日韩剧",), "JAPANESE AND KOREAN SERIES"),
-                    (("韩剧", "韩国剧"), "KOREAN DRAMA"),
-                    (("日剧", "日本剧"), "JAPANESE DRAMA"),
-                    (("美剧", "欧美剧", "英剧"), "WESTERN TV SERIES"),
-                    (("纪录电影", "记录电影"), "DOCUMENTARY FILMS"),
-                    (("纪录片", "纪录"), "DOCUMENTARIES"),
-                    (("综艺",), "VARIETY SHOWS"),
-                    (("演唱会",), "CONCERTS"),
-                    (("电影",), "MOVIES"),
-                )
-                subtitle = exact_subtitles.get(normalized_name) or next(
-                    (label for keywords, label in name_subtitles
-                     if any(keyword in normalized_name for keyword in keywords)),
-                    None,
-                ) or {
+                # 默认只使用 Emby 媒体库类型，不翻译或猜测媒体库名称。
+                subtitle = {
                     "movies": "MOVIES",
                     "tvshows": "TV SHOWS",
                     "music": "MUSIC",
@@ -775,16 +722,8 @@ class Plugin(BasePlugin):
         # 英文副标题和数字角标也做同样的签名字形检查。当前语义副标题为 ASCII，
         # 但用户可换字体；提前锁定能避免未来某款字体缺少 &、数字或连字符。
         subtitle_samples = [
-            "CHINESE SERIES", "CHINESE ANIMATION", "CHILDREN",
-            "JAPANESE AND KOREAN SERIES", "VARIETY SHOWS", "DOCUMENTARIES",
-            "SHORT DRAMAS", "CHINESE LANGUAGE FILMS", "FOREIGN LANGUAGE FILMS",
-            "ANIMATED MOVIES", "UNCENSORED", "CENSORED",
-            "CHINESE SUBTITLES", "DOMESTIC", "FC2",
-            "EUROPEAN AND AMERICAN", "TANGXIN VLOG AND WANOU JIEJIE", "JAPANESE ANIMATION",
-            "WESTERN ANIMATION", "TOKUSATSU MOVIES", "TOKUSATSU SERIES",
-            "R RATED MOVIES", "JAPANESE AND KOREAN MOVIES",
-            "WESTERN TV SERIES", "HONG KONG AND TAIWANESE SERIES",
-            "DOCUMENTARY FILMS", "CONCERTS", "LTX CRACKED", "MEDIA LIBRARY",
+            "MOVIES", "TV SHOWS", "MUSIC", "COLLECTIONS", "BOOKS",
+            "VIDEOS", "MUSIC VIDEOS", "PHOTOS", "PLAYLISTS", "MEDIA LIBRARY",
         ]
         # 加入用户可能输入的自定义副标题；没有自定义值时检查全部自动语义文本。
         requested_subtitle = str(batch_input.get("subtitle") or "").strip()
@@ -1112,7 +1051,7 @@ class Plugin(BasePlugin):
                 }]),
             ),
             ui.Card(
-                ui.Text(text="资源与内容。标题留空时：主标题自动使用媒体库名称，副标题自动使用媒体库英文类型。"),
+                ui.Text(text="资源与内容。标题留空时：主标题自动使用媒体库名称，副标题按 Emby 类型显示英文（电影 MOVIES、电视剧 TV SHOWS）；填写自定义副标题后优先使用填写内容。"),
                 ui.Input(label="海报数量（奇数）", bind="state.posterCount", type="number"),
                 ui.Input(label="主标题内容（留空自动）", bind="state.title"),
                 ui.Input(label="副标题内容（留空自动）", bind="state.subtitle"),
