@@ -1,7 +1,7 @@
 {
   "id": "cover.factory",
   "name": "封面工厂",
-  "version": "0.6.13",
+  "version": "0.6.14",
   "sdkVersion": "2",
   "author": "W佬",
   "description": "复用 FrameBase 的 Pillow 封面渲染核心，从本地授权目录素材图片生成 Emby 封面（九宫格/堆叠/海报墙等多种布局），并可通过 Emby API 上传到目标条目。",
@@ -23,6 +23,18 @@
       "label": "Emby API Key（Emby 后台 → 设置 → 高级 → API 密钥 → 新建）",
       "type": "text",
       "default": ""
+    },
+    {
+      "key": "customTitle",
+      "label": "自定义主标题（留空使用 Emby 媒体库名称，填写后应用于所有生成任务）",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "key": "customSubtitle",
+      "label": "自定义副标题（留空使用 Emby 类型英文，填写后应用于所有生成任务）",
+      "type": "text",
+      "default": ""
     }
   ],
   "configSchema": {
@@ -34,7 +46,9 @@
       },
       "embyApiKey": {
         "type": "string"
-      }
+      },
+      "customTitle": {"type": "string"},
+      "customSubtitle": {"type": "string"}
     }
   },
   "actions": [

@@ -555,8 +555,8 @@ class Plugin(BasePlugin):
         config: dict[str, Any] = self._layout_defaults(layout)
         config.update({
             "engine": layout,
-            "title": input.get("title") or title,
-            "subtitle": input.get("subtitle") or subtitle,
+            "title": cfg.get("customTitle") or title,
+            "subtitle": cfg.get("customSubtitle") or subtitle,
             "font_title": input.get("fontTitle") or cfg.get("fontTitle") or config.get("font_title") or "OPPOSans-B.ttf",
             "force_uniform_title_font": bool(input.get("forceUniformTitleFont")),
             "font_subtitle": input.get("fontSubtitle") or cfg.get("fontSubtitle") or config.get("font_subtitle") or "OPPOSans-B.ttf",
@@ -726,7 +726,7 @@ class Plugin(BasePlugin):
             "VIDEOS", "MUSIC VIDEOS", "PHOTOS", "PLAYLISTS", "MEDIA LIBRARY",
         ]
         # 加入用户可能输入的自定义副标题；没有自定义值时检查全部自动语义文本。
-        requested_subtitle = str(batch_input.get("subtitle") or "").strip()
+        requested_subtitle = str(self._plugin_config(ctx).get("customSubtitle") or "").strip()
         subtitle_texts = [requested_subtitle] if requested_subtitle else subtitle_samples
         chosen_subtitle_font, subtitle_missing = self.engine().resolve_font_filename_for_texts(
             batch_input.get("fontSubtitle") or batch_input.get("fontTitle") or "OPPOSans-B.ttf",
@@ -1007,8 +1007,6 @@ class Plugin(BasePlugin):
                         "badgeFont": ui.ref("state.badgeFont"),
                         "badgeSize": ui.ref("state.badgeSize"),
                         "posterCount": ui.ref("state.posterCount"),
-                        "title": ui.ref("state.title"),
-                        "subtitle": ui.ref("state.subtitle"),
                         "titleSize": ui.ref("state.titleSize"),
                         "subtitleSize": ui.ref("state.subtitleSize"),
                         "titleColorMode": ui.ref("state.titleColorMode"),
@@ -1034,8 +1032,6 @@ class Plugin(BasePlugin):
                         "badgeFont": ui.ref("state.badgeFont"),
                         "badgeSize": ui.ref("state.badgeSize"),
                         "posterCount": ui.ref("state.posterCount"),
-                        "title": ui.ref("state.title"),
-                        "subtitle": ui.ref("state.subtitle"),
                         "titleSize": ui.ref("state.titleSize"),
                         "subtitleSize": ui.ref("state.subtitleSize"),
                         "titleColorMode": ui.ref("state.titleColorMode"),
@@ -1051,10 +1047,8 @@ class Plugin(BasePlugin):
                 }]),
             ),
             ui.Card(
-                ui.Text(text="资源与内容。标题留空时：主标题自动使用媒体库名称，副标题按 Emby 类型显示英文（电影 MOVIES、电视剧 TV SHOWS）；填写自定义副标题后优先使用填写内容。"),
+                ui.Text(text="标题默认使用 Emby 媒体库名称，副标题默认使用类型英文（电影 MOVIES、电视剧 TV SHOWS）。自定义主副标题请在插件设置中填写，工作台仅调整排版。"),
                 ui.Input(label="海报数量（奇数）", bind="state.posterCount", type="number"),
-                ui.Input(label="主标题内容（留空自动）", bind="state.title"),
-                ui.Input(label="副标题内容（留空自动）", bind="state.subtitle"),
                 *typography_hints,
                 ui.Text(text="主副标题字体默认跟随当前布局；已保存的字体选择优先，选择“跟随当前布局默认字体”可恢复布局原字体。角标字体保留已选值。字号为 1920×1080 设计尺寸，动态输出会按分辨率等比例缩放。"),
                 ui.Input(label="主标题大小（留空使用上方默认值）", bind="state.titleSize", type="number"),
@@ -1076,8 +1070,6 @@ class Plugin(BasePlugin):
                     "type": "invoke", "actionId": "save-settings",
                     "input": {
                         "posterCount": ui.ref("state.posterCount"),
-                        "title": ui.ref("state.title"),
-                        "subtitle": ui.ref("state.subtitle"),
                         "titleSize": ui.ref("state.titleSize"),
                         "subtitleSize": ui.ref("state.subtitleSize"),
                         "titleColorMode": ui.ref("state.titleColorMode"),
@@ -1086,7 +1078,7 @@ class Plugin(BasePlugin):
                         "subtitleColor": ui.ref("state.subtitleColor"),
                     },
                 }]),
-                ui.Text(text="这里保存后，海报数量、自定义主副标题和文字颜色会在刷新页面、重新打开插件及重启后恢复。"),
+                ui.Text(text="这里保存海报数量、字号和文字颜色；自定义主副标题请到插件设置中填写。"),
             ),
             ui.Card(
                 ui.Text(text="字体与角标（其他位置、颜色和布局细节均使用所选布局的上游默认值）。"),
@@ -1131,8 +1123,6 @@ class Plugin(BasePlugin):
                         "badgeFont": ui.ref("state.badgeFont"),
                         "badgeSize": ui.ref("state.badgeSize"),
                         "posterCount": ui.ref("state.posterCount"),
-                        "title": ui.ref("state.title"),
-                        "subtitle": ui.ref("state.subtitle"),
                         "titleSize": ui.ref("state.titleSize"),
                         "subtitleSize": ui.ref("state.subtitleSize"),
                         "titleColorMode": ui.ref("state.titleColorMode"),

@@ -213,8 +213,14 @@ def test_auto_subtitles_plain_words_and_custom_symbols_preserved():
             assert captured["subtitle"] == expected
             assert captured["title"] == name
     custom = "MY MOVIES & TV | 4K ★"
-    p.generate_cover({"serverId": "s1", "libraryId": "17", "subtitle": custom, "upload": False}, ctx)
+    p._plugin_config = lambda ctx: {"customSubtitle": custom, "customTitle": "我的标题"}
+    p.generate_cover({"serverId": "s1", "libraryId": "17", "subtitle": "旧工作台副标题", "title": "旧工作台标题", "upload": False}, ctx)
     assert captured["subtitle"] == custom
+    assert captured["title"] == "我的标题"
+    p._plugin_config = lambda ctx: {}
+    p.generate_cover({"serverId": "s1", "libraryId": "17", "subtitle": "旧工作台副标题", "title": "旧工作台标题", "upload": False}, ctx)
+    assert captured["title"] == current["name"]
+    assert captured["subtitle"] == "MEDIA LIBRARY"
 
 
 def test_explicit_title_subtitle_sizes_reach_engine():
