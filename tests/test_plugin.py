@@ -213,10 +213,17 @@ def test_auto_subtitles_plain_words_and_custom_symbols_preserved():
             assert captured["subtitle"] == expected
             assert captured["title"] == name
     custom = "MY MOVIES & TV | 4K ★"
-    p._plugin_config = lambda ctx: {"customSubtitle": custom, "customTitle": "我的标题"}
+    mapping = __import__("json").dumps({current["name"]: custom, "港台剧": "HK SERIES"})
+    p._plugin_config = lambda ctx: {"librarySubtitles": mapping}
     p.generate_cover({"serverId": "s1", "libraryId": "17", "subtitle": "旧工作台副标题", "title": "旧工作台标题", "upload": False}, ctx)
     assert captured["subtitle"] == custom
-    assert captured["title"] == "我的标题"
+    assert captured["title"] == current["name"]
+    current["name"] = "港台剧"
+    p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
+    assert captured["subtitle"] == "HK SERIES"
+    current["name"] = "未配置的库"
+    p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
+    assert captured["subtitle"] == "MEDIA LIBRARY"
     p._plugin_config = lambda ctx: {}
     p.generate_cover({"serverId": "s1", "libraryId": "17", "subtitle": "旧工作台副标题", "title": "旧工作台标题", "upload": False}, ctx)
     assert captured["title"] == current["name"]

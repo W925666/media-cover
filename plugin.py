@@ -55,6 +55,18 @@ def _parse_size(value: Any, default: int) -> int:
     return max(8, min(500, size))
 
 
+def _library_subtitles(config: dict) -> dict[str, str]:
+    """逐库名称精确映射；异常配置明确报错，防止静默套用全局文字。"""
+    raw = config.get("librarySubtitles") or "{}"
+    try:
+        mapping = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError) as exc:
+        raise ValueError('逐库副标题对应表需填写 JSON，例如 {"港台剧":"HK SERIES"}') from exc
+    if not isinstance(mapping, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in mapping.items()):
+        raise ValueError("逐库副标题对应表必须是媒体库名称到副标题文字的 JSON 对象")
+    return {k.strip(): v for k, v in mapping.items()}
+
+
 def _storage_value(data: Any) -> Any:
     """storage.get 的返回形状不一：None / 无 found 字段时安全取 value。"""
     if not isinstance(data, dict) or not data.get("found"):
@@ -555,8 +567,8 @@ class Plugin(BasePlugin):
         config: dict[str, Any] = self._layout_defaults(layout)
         config.update({
             "engine": layout,
-            "title": cfg.get("customTitle") or title,
-            "subtitle": cfg.get("customSubtitle") or subtitle,
+            "title": title,
+            "subtitle": _library_subtitles(cfg).get(str(title).strip(), subtitle),
             "font_title": input.get("fontTitle") or cfg.get("fontTitle") or config.get("font_title") or "OPPOSans-B.ttf",
             "force_uniform_title_font": bool(input.get("forceUniformTitleFont")),
             "font_subtitle": input.get("fontSubtitle") or cfg.get("fontSubtitle") or config.get("font_subtitle") or "OPPOSans-B.ttf",
@@ -726,8 +738,8 @@ class Plugin(BasePlugin):
             "VIDEOS", "MUSIC VIDEOS", "PHOTOS", "PLAYLISTS", "MEDIA LIBRARY",
         ]
         # 加入用户可能输入的自定义副标题；没有自定义值时检查全部自动语义文本。
-        requested_subtitle = str(self._plugin_config(ctx).get("customSubtitle") or "").strip()
-        subtitle_texts = [requested_subtitle] if requested_subtitle else subtitle_samples
+        custom_subtitles = list(_library_subtitles(self._plugin_config(ctx)).values())
+        subtitle_texts = subtitle_samples + custom_subtitles
         chosen_subtitle_font, subtitle_missing = self.engine().resolve_font_filename_for_texts(
             batch_input.get("fontSubtitle") or batch_input.get("fontTitle") or "OPPOSans-B.ttf",
             subtitle_texts, 64, return_missing=True,
@@ -1047,7 +1059,7 @@ class Plugin(BasePlugin):
                 }]),
             ),
             ui.Card(
-                ui.Text(text="标题默认使用 Emby 媒体库名称，副标题默认使用类型英文（电影 MOVIES、电视剧 TV SHOWS）。自定义主副标题请在插件设置中填写，工作台仅调整排版。"),
+                ui.Text(text="标题默认使用 Emby 媒体库名称，副标题默认使用类型英文（电影 MOVIES、电视剧 TV SHOWS）。在插件设置的逐库副标题对应表中配置“媒体库名称 → 副标题”，每个媒体库单独匹配；工作台仅调整排版。"),
                 ui.Input(label="海报数量（奇数）", bind="state.posterCount", type="number"),
                 *typography_hints,
                 ui.Text(text="主副标题字体默认跟随当前布局；已保存的字体选择优先，选择“跟随当前布局默认字体”可恢复布局原字体。角标字体保留已选值。字号为 1920×1080 设计尺寸，动态输出会按分辨率等比例缩放。"),
@@ -1078,7 +1090,7 @@ class Plugin(BasePlugin):
                         "subtitleColor": ui.ref("state.subtitleColor"),
                     },
                 }]),
-                ui.Text(text="这里保存海报数量、字号和文字颜色；自定义主副标题请到插件设置中填写。"),
+                ui.Text(text="这里保存海报数量、字号和文字颜色；各库副标题请到插件设置的逐库对应表填写。"),
             ),
             ui.Card(
                 ui.Text(text="字体与角标（其他位置、颜色和布局细节均使用所选布局的上游默认值）。"),
