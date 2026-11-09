@@ -201,9 +201,12 @@ def test_auto_subtitles_plain_words_and_custom_symbols_preserved():
     p._plugin_config = lambda ctx: {}
     p._direct_for_server = lambda *args: types.SimpleNamespace(ok=False)
     p._layout_defaults = lambda layout: {}
-    cases = {"儿童": "CHILDREN", "日韩剧": "JAPANESE AND KOREAN TV SERIES",
+    cases = {"儿童": "CHILDREN", "日韩剧": "JAPANESE AND KOREAN SERIES",
              "日韩电影": "JAPANESE AND KOREAN MOVIES",
-             "港台剧": "HONG KONG AND TAIWAN DRAMA", "R级电影": "R RATED MOVIES"}
+             "港台剧": "HONG KONG AND TAIWANESE SERIES", "R级电影": "R RATED MOVIES",
+             "华语电影": "CHINESE LANGUAGE FILMS", "外语电影": "FOREIGN LANGUAGE FILMS",
+             "FC2": "FC2", "国产": "DOMESTIC", "欧美": "EUROPEAN AND AMERICAN",
+             "糖心Vlog&玩偶姐姐": "TANGXIN VLOG AND WANOU JIEJIE", "LTX破解": "LTX CRACKED"}
     for name, expected in cases.items():
         current["name"] = name
         p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
