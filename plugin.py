@@ -469,8 +469,8 @@ class Plugin(BasePlugin):
                 normalized_name = str(title).strip().lower()
                 exact_subtitles = {
                     "国漫": "CHINESE ANIMATION",
-                    "儿童": "KIDS & FAMILY",
-                    "日韩剧": "JAPAN & KOREA TV",
+                    "儿童": "CHILDREN",
+                    "日韩剧": "JAPANESE AND KOREAN TV SERIES",
                     "综艺剧": "VARIETY SHOWS",
                     "纪录片": "DOCUMENTARIES",
                     "短剧": "SHORT DRAMAS",
@@ -488,10 +488,10 @@ class Plugin(BasePlugin):
                     "欧美漫": "WESTERN ANIMATION",
                     "特摄电影": "TOKUSATSU MOVIES",
                     "特摄剧": "TOKUSATSU SERIES",
-                    "r级电影": "R-RATED MOVIES",
-                    "日韩电影": "JAPANESE & KOREAN MOVIES",
+                    "r级电影": "R RATED MOVIES",
+                    "日韩电影": "JAPANESE AND KOREAN MOVIES",
                     "欧美剧": "WESTERN TV SERIES",
-                    "港台剧": "HONG KONG & TAIWAN DRAMA",
+                    "港台剧": "HONG KONG AND TAIWAN DRAMA",
                     "记录电影": "DOCUMENTARY FILMS",
                     "演唱会": "CONCERTS",
                     "ltx破解": "LTX MEDIA",
@@ -503,7 +503,7 @@ class Plugin(BasePlugin):
                     (("动画电影",), "ANIMATED MOVIES"),
                     (("动漫", "动画", "anime"), "ANIMATION"),
                     (("国产剧", "国剧", "大陆剧"), "CHINESE DRAMA"),
-                    (("日韩剧",), "JAPAN & KOREA TV"),
+                    (("日韩剧",), "JAPANESE AND KOREAN TV SERIES"),
                     (("韩剧", "韩国剧"), "KOREAN DRAMA"),
                     (("日剧", "日本剧"), "JAPANESE DRAMA"),
                     (("美剧", "欧美剧", "英剧"), "WESTERN TV SERIES"),
@@ -774,15 +774,15 @@ class Plugin(BasePlugin):
         # 英文副标题和数字角标也做同样的签名字形检查。当前语义副标题为 ASCII，
         # 但用户可换字体；提前锁定能避免未来某款字体缺少 &、数字或连字符。
         subtitle_samples = [
-            "CHINESE DRAMA", "CHINESE ANIMATION", "KIDS & FAMILY",
-            "JAPAN & KOREA TV", "VARIETY SHOWS", "DOCUMENTARIES",
+            "CHINESE DRAMA", "CHINESE ANIMATION", "CHILDREN",
+            "JAPANESE AND KOREAN TV SERIES", "VARIETY SHOWS", "DOCUMENTARIES",
             "SHORT DRAMAS", "CHINESE MOVIES", "INTERNATIONAL MOVIES",
             "ANIMATED MOVIES", "UNCENSORED", "CENSORED",
             "CHINESE SUBTITLES", "CHINESE CONTENT", "FC2 CONTENT",
             "WESTERN CONTENT", "CREATOR VIDEOS", "JAPANESE ANIMATION",
             "WESTERN ANIMATION", "TOKUSATSU MOVIES", "TOKUSATSU SERIES",
-            "R-RATED MOVIES", "JAPANESE & KOREAN MOVIES",
-            "WESTERN TV SERIES", "HONG KONG & TAIWAN DRAMA",
+            "R RATED MOVIES", "JAPANESE AND KOREAN MOVIES",
+            "WESTERN TV SERIES", "HONG KONG AND TAIWAN DRAMA",
             "DOCUMENTARY FILMS", "CONCERTS", "LTX MEDIA", "MEDIA LIBRARY",
         ]
         # 加入用户可能输入的自定义副标题；没有自定义值时检查全部自动语义文本。

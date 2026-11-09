@@ -182,6 +182,38 @@ def test_library_without_collection_type_keeps_subtitle():
     assert captured["subtitle"] == "SHORT DRAMAS", captured
 
 
+def test_auto_subtitles_plain_words_and_custom_symbols_preserved():
+    p = plugin.Plugin()
+    ctx = FakeCtx(files=[{"ref": "dummy.jpg"}])
+    current = {"name": "儿童"}
+    class LibraryEmby(FakeEmby):
+        def request(self, **kwargs):
+            return {"status": 200, "data": {"Items": [{
+                "Name": current["name"], "Type": "CollectionFolder", "CollectionType": "tvshows"
+            }]}}
+    ctx.mt.emby = LibraryEmby()
+    captured = {}
+    class Engine:
+        def draw(self, config, assets):
+            captured.update(config)
+            return base64.b64encode(b"preview").decode()
+    p.engine = lambda: Engine()
+    p._plugin_config = lambda ctx: {}
+    p._direct_for_server = lambda *args: types.SimpleNamespace(ok=False)
+    p._layout_defaults = lambda layout: {}
+    cases = {"儿童": "CHILDREN", "日韩剧": "JAPANESE AND KOREAN TV SERIES",
+             "日韩电影": "JAPANESE AND KOREAN MOVIES",
+             "港台剧": "HONG KONG AND TAIWAN DRAMA", "R级电影": "R RATED MOVIES"}
+    for name, expected in cases.items():
+        current["name"] = name
+        p.generate_cover({"serverId": "s1", "libraryId": "17", "upload": False}, ctx)
+        assert captured["subtitle"] == expected
+        assert all(c.isalnum() or c.isspace() for c in captured["subtitle"])
+    custom = "MY MOVIES & TV | 4K ★"
+    p.generate_cover({"serverId": "s1", "libraryId": "17", "subtitle": custom, "upload": False}, ctx)
+    assert captured["subtitle"] == custom
+
+
 def test_explicit_title_subtitle_sizes_reach_engine():
     p = plugin.Plugin()
     ctx = FakeCtx(files=[{"ref": "dummy.jpg"}])
