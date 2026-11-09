@@ -32,7 +32,7 @@
     },
     {
       "key": "titleMap",
-      "label": "标题映射表 JSON：{\"港台剧\":{\"title\":\"\",\"subtitle\":\"HK SERIES\"},\"动画电影\":{\"title\":\"\",\"subtitle\":\"ANIMATED MOVIES\"}}；键为 Emby 库原名，title 留空用库名，subtitle 留空用类型英文",
+      "label": "标题映射表 JSON（按库原名匹配；留空字段使用默认值）",
       "type": "text",
       "default": "{}"
     }
