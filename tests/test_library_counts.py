@@ -43,6 +43,28 @@ def test_generation_persists_selection_without_target_scope():
     assert 'libraryId'not in saved and 'upload'not in saved
     assert plugin._generation_input({},ctx)['layout']=='经典九宫格'
 
+def test_batch_preserves_custom_fonts_and_internal_calls_do_not_write_settings():
+    ctx=FakeCtx()
+    p=plugin.Plugin()
+    selected={'serverId':'s1','layout':'经典九宫格','fontTitle':'custom.ttf','fontSubtitle':'english.ttf','badgeFont':'digits.ttf','showSubtitle':False}
+    p._cover_libraries=lambda *args:[{'Id':'a','Name':'普通库'},{'Id':'b','Name':'罕见字龘库'}]
+    p.engine=lambda:SimpleNamespace(clear_image_cache=lambda:None)
+    received=[]
+    def generate(input,ctx):
+        received.append(dict(input))
+        # 模拟库内缺字后的内部设置，必须不污染用户保存值。
+        plugin._generation_input({**input,'fontTitle':'fallback.ttf'},ctx)
+        return {'uploaded':True,'size':1}
+    p.generate_cover=generate
+    result=p.generate_all(selected,ctx)
+    assert result['uploaded']==2
+    for item in received:
+        assert item['fontTitle']=='custom.ttf' and item['fontSubtitle']=='english.ttf'
+        assert item['badgeFont']=='digits.ttf' and item['layout']=='经典九宫格'
+        assert item['_batch_internal'] is True
+        assert 'forceUniformTitleFont'not in item
+    assert ctx.mt.storage.get('ui-settings')['value']['fontTitle']=='custom.ttf'
+
 def test_zero_count_draws_but_unknown_does_not():
     root=Path(__file__).resolve().parents[1]
     engine=PosterEngine(fonts_dir=str(root/'fonts'),layouts_dir=str(root/'layouts'))

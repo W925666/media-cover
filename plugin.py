@@ -104,7 +104,7 @@ def _generation_input(input: dict | None, ctx: Context) -> dict:
     # 宿主开始任务后会重载页面；先持久化本次选择，避免 state 回到旧默认布局。
     explicit = {k: v for k, v in (input or {}).items()
                 if k in GENERATION_SETTING_KEYS and v is not None}
-    if explicit:
+    if explicit and not (input or {}).get("_batch_internal"):
         settings = dict(saved) if isinstance(saved, dict) else {}
         settings.update(explicit)
         ctx.mt.storage.set(key="ui-settings", value=settings)
@@ -802,52 +802,10 @@ class Plugin(BasePlugin):
             if not libs:
                 raise ValueError("所选媒体库不在当前服务器列表中，请先加载/刷新媒体库")
         ctx.mt.log(level="info", message=f"开始批量生成，共 {len(libs)} 个媒体库")
-        # 先用全部媒体库名称选出同一款可覆盖所有字符的字体。此前每个库独立
-        # fallback，某些名称会切到另一字体，视觉字面高度不同，看起来一大一小。
+        # 与单库共用逐条目的字体解析，不用其他库的缺字覆盖用户选择。
+        # 顶层任务已保存原始设置；内部子调用禁止回写设置。
         batch_input = dict(input or {})
-        all_names = [str(lib.get("Name") or "") for lib in libs]
-        chosen_title_font, title_missing = self.engine().resolve_font_filename_for_texts(
-            batch_input.get("fontTitle") or "剑豪体.ttf", all_names, 96,
-            return_missing=True,
-        )
-        if chosen_title_font and batch_input.get('fontTitle'):
-            batch_input["fontTitle"] = chosen_title_font
-            batch_input["forceUniformTitleFont"] = True
-        # 英文副标题和数字角标也做同样的签名字形检查。当前语义副标题为 ASCII，
-        # 但用户可换字体；提前锁定能避免未来某款字体缺少 &、数字或连字符。
-        subtitle_samples = [
-            "MOVIES", "TV SHOWS", "MUSIC", "COLLECTIONS", "BOOKS",
-            "VIDEOS", "MUSIC VIDEOS", "PHOTOS", "PLAYLISTS", "MEDIA LIBRARY",
-        ]
-        # 加入用户可能输入的自定义副标题；没有自定义值时检查全部自动语义文本。
-        custom_subtitles = [entry.get("subtitle", "") for entry in _title_map(self._plugin_config(ctx)).values()]
-        subtitle_texts = subtitle_samples + custom_subtitles
-        chosen_subtitle_font, subtitle_missing = self.engine().resolve_font_filename_for_texts(
-            batch_input.get("fontSubtitle") or batch_input.get("fontTitle") or "OPPOSans-B.ttf",
-            subtitle_texts, 64, return_missing=True,
-        )
-        chosen_badge_font, badge_missing = self.engine().resolve_font_filename_for_texts(
-            batch_input.get("badgeFont") or batch_input.get("fontTitle") or "OPPOSans-B.ttf",
-            ["0123456789"], 64, return_missing=True,
-        )
-        if chosen_subtitle_font and batch_input.get('fontSubtitle'):
-            batch_input["fontSubtitle"] = chosen_subtitle_font
-        if chosen_badge_font:
-            batch_input["badgeFont"] = chosen_badge_font
-        unresolved = {
-            "标题": title_missing,
-            "副标题": subtitle_missing,
-            "角标": badge_missing,
-        }
-        for label, missing_chars in unresolved.items():
-            if missing_chars:
-                rendered = " ".join(
-                    f"{char}(U+{ord(char):04X})" for char in missing_chars[:30]
-                )
-                ctx.mt.log(
-                    level="warn",
-                    message=f"{label}仍有未覆盖字形：{rendered}",
-                )
+        batch_input.pop("forceUniformTitleFont", None)
         ctx.mt.log(level="info", message=(
             f"批量参数已锁定：布局={batch_input.get('layout') or '默认'}，"
             f"标题字体={batch_input.get('fontTitle') or '默认'}，"
@@ -861,6 +819,7 @@ class Plugin(BasePlugin):
             try:
                 one = self.generate_cover({
                     **batch_input,
+                    "_batch_internal": True,
                     "serverId": server_id,
                     "libraryId": str(lib["Id"]),
                     "upload": True,
