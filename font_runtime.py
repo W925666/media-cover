@@ -45,11 +45,22 @@ def temporary_fonts(method):
             # Read saved selection without altering user settings.
             saved = ctx.mt.storage.get(key='ui-settings') or {}
             saved = saved.get('value', {}) if saved.get('found') else {}
-            selection = dict(saved) if isinstance(saved, dict) else {}
             cfg = self._plugin_config(ctx)
-            selection.update({k:v for k,v in cfg.items() if k in ('fontTitle','fontSubtitle','badgeFont')})
+            selection = {k:v for k,v in cfg.items() if k in ('fontTitle','fontSubtitle','badgeFont')}
+            if isinstance(saved, dict):
+                selection.update({k:v for k,v in saved.items() if v is not None})
             selection.update(input or {})
+            # Empty UI selection means layout/config default, just as generate_cover does.
+            for key in ('fontTitle', 'fontSubtitle', 'badgeFont'):
+                if not selection.get(key) and cfg.get(key):
+                    selection[key] = cfg[key]
+            defaults = self._layout_defaults(selection.get('layout') or '扇形展开')
+            aliases = {'字魂白鸽天行体(商用需授权).ttf': '字魂白鸽天行体.ttf'}
             names = {'OPPOSans-B.ttf', '剑豪体.ttf', 'SourceHanSansCN-Bold.otf'}
+            for key in ('font_title', 'font_subtitle', 'font_sub', 'font_count', 'badge_font'):
+                name = aliases.get(defaults.get(key), defaults.get(key))
+                if name and name != 'default.ttf':
+                    names.add(name)
             for key in ('fontTitle', 'fontSubtitle', 'badgeFont'):
                 if selection.get(key):
                     names.add(selection[key])

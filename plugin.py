@@ -878,7 +878,11 @@ class Plugin(BasePlugin):
                         data = json.load(fh)
                     if str(data.get("engine") or "") == layout:
                         cfg = data.get("config")
-                        return dict(cfg) if isinstance(cfg, dict) else {}
+                        result = dict(cfg) if isinstance(cfg, dict) else {}
+                        for key in ('font_title', 'font_subtitle', 'font_count', 'badge_font'):
+                            if isinstance(result.get(key), str):
+                                result[key] = result[key].replace('(商用需授权)', '')
+                        return result
                 except (OSError, ValueError, TypeError):
                     continue
         except OSError:
@@ -900,6 +904,10 @@ class Plugin(BasePlugin):
             config['subtitle_size'] = config['sub_size']
         if 'font_subtitle' not in config and 'font_sub' in config:
             config['font_subtitle'] = config['font_sub']
+        # 上游预设旧文件名与当前完整原件同一字体，避免默默回退。
+        for key in ('font_title', 'font_subtitle', 'font_sub', 'badge_font'):
+            if config.get(key) == '字魂白鸽天行体(商用需授权).ttf':
+                config[key] = '字魂白鸽天行体.ttf'
         return config
 
     def _load_template(self, ctx: Context, name: str) -> dict:

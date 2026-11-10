@@ -551,20 +551,23 @@ class PosterEngine:
         badge_font_file = config.get('badge_font', 'default.ttf')
         base_size = 40 if style == 'box' else 50
         user_size = int(config.get('badge_size', base_size))
+        # Numeric badges must verify glyph coverage as titles do; directory order is not a font policy.
+        # Keep the 4x supersampled size (the generic text loader clamps at 500).
         scaled_font = None
-        if badge_font_file:
-            path = os.path.join(self.fonts_dir, badge_font_file)
-            if os.path.exists(path):
-                try: scaled_font = ImageFont.truetype(path, user_size * scale)
-                except: pass
-        if not scaled_font:
+        candidates = [badge_font_file, 'OPPOSans-B.ttf', 'SourceHanSansCN-Bold.otf']
+        candidates += self._available_font_names()
+        for name in dict.fromkeys(candidates):
+            if not name:
+                continue
             try:
-                available_fonts = [f for f in os.listdir(self.fonts_dir) if f.lower().endswith(('.ttf', '.otf'))]
-                if available_fonts:
-                    fallback_path = os.path.join(self.fonts_dir, available_fonts[0])
-                    scaled_font = ImageFont.truetype(fallback_path, user_size * scale)
-            except: pass
-        if not scaled_font: scaled_font = ImageFont.load_default()
+                candidate = ImageFont.truetype(os.path.join(self.fonts_dir, name), user_size * scale)
+                if self._font_supports_text(candidate, count_str):
+                    scaled_font = candidate
+                    break
+            except OSError:
+                continue
+        if scaled_font is None:
+            raise ValueError('No available font supports badge digits: ' + count_str)
 
         if config.get('badge_follow_text_color'):
             config = dict(config)
