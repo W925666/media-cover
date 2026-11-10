@@ -353,17 +353,47 @@ class Plugin(BasePlugin):
             pass
         return _storage_value(ctx.mt.storage.get(key="config")) or {}
 
+    @staticmethod
+    def _library_item_types(collection_type: str) -> str:
+        return {
+            "movies": "Movie", "tvshows": "Series", "music": "MusicAlbum",
+            "musicvideos": "MusicVideo", "books": "Book,AudioBook",
+            "photos": "Photo,PhotoAlbum", "homevideos": "Video",
+            "boxsets": "BoxSet", "collections": "BoxSet", "playlists": "Playlist",
+        }.get(str(collection_type or "").lower(), "Movie,Series")
+
+    def _fetch_library_count(self, ctx: Context, server_id: str, library_id: str,
+                             collection_type: str = "") -> int | None:
+        """独立统计作品；未知/失败不使用素材数量冒充，真实零值保留。"""
+        try:
+            result = ctx.mt.emby.request(server_id=server_id, path="/Items", query={
+                "ParentId": library_id, "Recursive": True,
+                "IncludeItemTypes": self._library_item_types(collection_type),
+                "Limit": 0, "EnableTotalRecordCount": True,
+            }) or {}
+            raw = (result.get("data") or {}).get("TotalRecordCount")
+            if result.get("status") != 200 or raw is None or isinstance(raw, bool):
+                raise ValueError("统计接口未返回总数")
+            total = int(raw)
+            if total < 0 or str(raw).strip() != str(total):
+                raise ValueError("统计接口总数无效")
+            return total
+        except Exception as exc:
+            ctx.mt.log(level="warn", message=f"媒体库 {library_id} 总数查询失败，隐藏数字角标：{type(exc).__name__}")
+            return None
+
     def _fetch_emby_posters(self, ctx: Context, server_id: str, library_id: str,
                             direct: EmbyDirect, count: int = 9,
-                            source_mode: str = "random") -> tuple[list[str], int, list[str]]:
+                            source_mode: str = "random", collection_type: str = "") -> tuple[list[str], int | None, list[str]]:
         """经 SDK 读同库条目（去重：作品名+年份只取一张），直连下载海报。
 
         返回 (图片 URL 列表, 库总数)。库总数用于角标显示——角标必须是
         媒体库的作品总数，不是取到的海报张数。
         """
+        total = self._fetch_library_count(ctx, server_id, library_id, collection_type)
         query = {
             "ParentId": library_id, "Recursive": True,
-            "IncludeItemTypes": "Movie,Series,BoxSet",
+            "IncludeItemTypes": self._library_item_types(collection_type),
             "Fields": "ProductionYear,ImageTags,BackdropImageTags,PremiereDate,DateCreated",
             "Limit": 300,
             "EnableTotalRecordCount": True,
@@ -377,11 +407,7 @@ class Plugin(BasePlugin):
             server_id=server_id, path="/Items", query=query,
         ) or {}
         if result.get("status") != 200 or not isinstance(result.get("data"), dict):
-            return [], 0, []
-        try:
-            total = int(result["data"].get("TotalRecordCount") or 0)
-        except (TypeError, ValueError):
-            total = 0
+            return [], total, []
         items = list(result["data"].get("Items", []) or [])
         if source_mode == "random":
             random.SystemRandom().shuffle(items)
@@ -406,7 +432,7 @@ class Plugin(BasePlugin):
                 break
         # 少数条目没有背景图时，不能让 backdrops 条件导致海报数量超过用户设置。
         # 背景不足由布局自行复用已有背景或主海报兜底。
-        return picked[:count], (total or len(items)), backdrops[:max(count, 3)]
+        return picked[:count], total, backdrops[:max(count, 3)]
 
     def _first_server_id(self, ctx: Context) -> str | None:
         """返回第一个已授权且启用的 Emby 服务器 ID，无则 None。"""
@@ -513,6 +539,7 @@ class Plugin(BasePlugin):
         # 1. 标题自动取条目名/库名
         title = ""
         subtitle = ""
+        collection_type = ""
         item = ctx.mt.emby.request(
             server_id=server_id,
             path="/Items",
@@ -559,19 +586,19 @@ class Plugin(BasePlugin):
         library_id = library_id_early or (str(input.get("libraryId")) if input.get("libraryId") not in (None, "") else None)
         poster_paths: list[str] = []
         backdrop_paths: list[str] = []
-        library_total = 0
+        library_total = None
         if direct.ok and library_id:
             try:
                 source_mode = str(input.get("sourceMode") or "random")
                 poster_paths, library_total, backdrop_paths = self._fetch_emby_posters(
                     ctx, server_id, str(library_id), direct,
                     count=max(1, int(input.get("posterCount") or 9)),
-                    source_mode=source_mode,
+                    source_mode=source_mode, collection_type=collection_type,
                 )
                 ctx.mt.log(level="info", message=f"取图模式={source_mode}，候选海报已选 {len(poster_paths)} 张")
             except Exception as e:
                 ctx.mt.log(level="warn", message=f"Emby 海报获取失败，改用本地素材: {e}")
-                poster_paths, library_total, backdrop_paths = [], 0, []
+                poster_paths, library_total, backdrop_paths = [], None, []
 
         root_id = input.get("rootId")
         asset_path = input.get("path") or "."
@@ -608,7 +635,7 @@ class Plugin(BasePlugin):
             "backdrops": backdrop_paths,
             "poster_backdrops": backdrop_paths,
             # 角标数字 = 媒体库作品总数（不是海报张数）
-            "count": library_total or len(poster_paths),
+            "count": library_total if library_id else len(poster_paths),
         }
         # 先加载 FrameBase 随布局发布的原版默认预设，再用布局 schema 补齐预设
         # 未声明的键。这样布局、坐标、比例、阴影、模糊与上游默认效果保持一致。
@@ -1152,7 +1179,7 @@ class Plugin(BasePlugin):
                           options=ui.ref("query.fonts.data")),
                 ui.Select(label="副标题字体", bind="state.fontSubtitle",
                           options=ui.ref("query.fonts.data")),
-                ui.Text(text="角标显示媒体库作品总数。"),
+                ui.Text(text="角标按媒体库类型统计作品总数：电影数电影、剧集数整部剧，合集库才数合集。不是当前用户的未观看数；统计失败时隐藏数字。"),
                 ui.Select(label="徽章样式", bind="state.badgeStyle", options=[
                     {"label": "圆角框", "value": "box"},
                     {"label": "斜带", "value": "ribbon"},

@@ -536,7 +536,7 @@ class PosterEngine:
 
     def _draw_badge(self, img, config, count, fonts):
         style = config.get('badge_style', 'none')
-        if style == 'none' or not count: return img
+        if style == 'none' or count is None or count == '': return img
         count_str = str(count)
         scale = 4
         w, h = img.size
