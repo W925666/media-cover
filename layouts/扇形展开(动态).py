@@ -151,6 +151,14 @@ def _draw_fan(ctx, canvas, config, pairs, active_index, progress=0.0):
             "opacity": progress if slot == incoming_slot else 1.0,
         })
 
+    safe_top = config.get("_text_safe_top", 0)
+    poster_top = min(item["y"] + item["height"] / 2 - (
+        abs(item["width"] * math.sin(math.radians(item["angle"]))) +
+        abs(item["height"] * math.cos(math.radians(item["angle"])))
+    ) / 2 for item in render_queue)
+    for item in render_queue:
+        item["y"] += max(0, safe_top - poster_top)
+
     render_queue.sort(key=lambda item: item["distance"], reverse=True)
     for item in render_queue:
         poster = ctx.download_img(item["url"])
@@ -282,5 +290,10 @@ def render(ctx, bg, config, assets, fonts, step=0.0):
     if blend > 0.0 and current != upcoming:
         upcoming_background = _state_background(ctx, bg, config, pairs[upcoming])
         canvas = Image.blend(canvas, upcoming_background, blend)
-    canvas = _draw_fan(ctx, canvas, config, pairs, current, blend)
-    return _draw_text(ctx, canvas, config, fonts)
+    text_layer = _draw_text(ctx, Image.new("RGBA", canvas.size, (0, 0, 0, 0)), config, fonts)
+    bounds = text_layer.getbbox()
+    frame_config = dict(config)
+    frame_config["_text_safe_top"] = bounds[3] + max(16, canvas.height // 45) if bounds else 0
+    canvas = _draw_fan(ctx, canvas, frame_config, pairs, current, blend)
+    canvas.alpha_composite(text_layer)
+    return canvas

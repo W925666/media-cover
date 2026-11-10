@@ -181,29 +181,9 @@ def render(ctx, bg, config, assets, fonts):
 
     render_list.sort(key=lambda x: x['z'])
 
-    # 4. 绘制海报
-    for item in render_list:
-        img = ctx.download_img(item['url'])
-        if not img: continue
-
-        img = img.resize((item['w'], item['h']), Image.LANCZOS)
-        img = add_rounded_corners(img, 15)
-
-        s_blur = 20 if item['z'] == 0 else 10
-        group, center_pt = create_shadow_and_reflection_group(img, ref_op, s_blur)
-
-        rotated_group = group.rotate(-item['angle'], resample=Image.BICUBIC, expand=True)
-
-        rw, rh = rotated_group.size
-        offset_y_fix = (item['h'] / 2)
-
-        paste_x = int(item['x'] - rw / 2)
-        paste_y = int(item['y'] - rh / 2 + offset_y_fix)
-
-        bg.paste(rotated_group, (paste_x, paste_y), mask=rotated_group)
-
     # 5. 绘制文字 (使用新版标准逻辑)
-    draw = ImageDraw.Draw(bg)
+    text_layer = Image.new("RGBA", bg.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(text_layer)
     title = config.get('title', '')
     subtitle = config.get('subtitle', '')
 
@@ -234,5 +214,40 @@ def render(ctx, bg, config, assets, fonts):
             sub_y = max(sub_y, title_end_y + 10)
 
         ctx.draw_text_wrapper(draw, subtitle, canvas_w // 2, sub_y, f_sub, canvas_w, c_sub, align='center')
+
+
+    # 按真实文字像素测量保留区；整组海报统一下移，字号和扇形结构不变。
+    text_bounds = text_layer.getbbox()
+    safe_top = text_bounds[3] + max(16, canvas_h // 45) if text_bounds else 0
+    poster_top = min(item['y'] + item['h'] / 2 - (
+        abs(item['w'] * math.sin(math.radians(item['angle']))) +
+        abs(item['h'] * math.cos(math.radians(item['angle'])))
+    ) / 2 for item in render_list)
+    poster_shift = max(0, safe_top - poster_top)
+    for item in render_list:
+        item['y'] += poster_shift
+
+    # 4. 绘制海报
+    for item in render_list:
+        img = ctx.download_img(item['url'])
+        if not img: continue
+
+        img = img.resize((item['w'], item['h']), Image.LANCZOS)
+        img = add_rounded_corners(img, 15)
+
+        s_blur = 20 if item['z'] == 0 else 10
+        group, center_pt = create_shadow_and_reflection_group(img, ref_op, s_blur)
+
+        rotated_group = group.rotate(-item['angle'], resample=Image.BICUBIC, expand=True)
+
+        rw, rh = rotated_group.size
+        offset_y_fix = (item['h'] / 2)
+
+        paste_x = int(item['x'] - rw / 2)
+        paste_y = int(item['y'] - rh / 2 + offset_y_fix)
+
+        bg.paste(rotated_group, (paste_x, paste_y), mask=rotated_group)
+
+    bg.alpha_composite(text_layer)
 
     return bg
