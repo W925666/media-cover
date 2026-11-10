@@ -46,12 +46,12 @@ def temporary_fonts(method):
             saved = ctx.mt.storage.get(key='ui-settings') or {}
             saved = saved.get('value', {}) if saved.get('found') else {}
             cfg = self._plugin_config(ctx)
-            selection = {k:v for k,v in cfg.items() if k in ('fontTitle','fontSubtitle','badgeFont')}
+            selection = {k:v for k,v in cfg.items() if k in ('fontTitle','fontSubtitle','badgeFont','fontCount')}
             if isinstance(saved, dict):
                 selection.update({k:v for k,v in saved.items() if v is not None})
             selection.update(input or {})
             # Empty UI selection means layout/config default, just as generate_cover does.
-            for key in ('fontTitle', 'fontSubtitle', 'badgeFont'):
+            for key in ('fontTitle', 'fontSubtitle', 'badgeFont', 'fontCount'):
                 if not selection.get(key) and cfg.get(key):
                     selection[key] = cfg[key]
             defaults = self._layout_defaults(selection.get('layout') or '扇形展开')
@@ -61,7 +61,7 @@ def temporary_fonts(method):
                 name = aliases.get(defaults.get(key), defaults.get(key))
                 if name and name != 'default.ttf':
                     names.add(name)
-            for key in ('fontTitle', 'fontSubtitle', 'badgeFont'):
+            for key in ('fontTitle', 'fontSubtitle', 'badgeFont', 'fontCount'):
                 if selection.get(key):
                     names.add(selection[key])
             by_name = {row['name']:row for row in rows}
