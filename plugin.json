@@ -176,8 +176,6 @@
           "badgeBorderOpacity": {
             "type": "integer"
           },
-          "badgeXPercent": {"type": "number", "minimum": 0, "maximum": 100},
-          "badgeYPercent": {"type": "number", "minimum": 0, "maximum": 100},
           "badgeEffectStrength": {"type": "integer", "minimum": 0, "maximum": 100},
           "titleOffsetY": {
             "type": "integer"
