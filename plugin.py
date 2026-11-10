@@ -270,6 +270,31 @@ class Plugin(BasePlugin):
     def items(self, input: dict, ctx: Context):
         return _storage_value(ctx.mt.storage.get(key="items")) or []
 
+    def _cover_libraries(self, ctx: Context, server_id: str) -> list[dict]:
+        """普通库加 Emby 实际提供的内置合集视图；不把单个 BoxSet 当首页入口。"""
+        response = ctx.mt.emby.request(server_id=server_id, path="/Library/SelectableMediaFolders") or {}
+        if response.get("status") != 200:
+            raise ValueError(f"Emby 返回 HTTP {response.get('status')}")
+        rows = response.get("data") or []
+        libraries = [dict(r) for r in rows if isinstance(r, dict) and r.get("Id") is not None]
+        seen = {str(r["Id"]) for r in libraries}
+        try:
+            views = ctx.mt.emby.request(server_id=server_id, path="/Items", query={
+                "IncludeItemTypes": "CollectionFolder,UserView", "Recursive": True,
+                "Fields": "CollectionType", "Limit": 1000,
+            }) or {}
+        except Exception as exc:
+            ctx.mt.log(level="warn", message=f"内置视图查询失败，保留普通媒体库：{type(exc).__name__}")
+            views = {}
+        data = views.get("data") or {}
+        for row in data.get("Items", []) if isinstance(data, dict) else []:
+            if (isinstance(row, dict) and row.get("Id") is not None
+                    and str(row.get("CollectionType") or "").lower() in ("boxsets", "collections")
+                    and str(row["Id"]) not in seen):
+                libraries.append(dict(row))
+                seen.add(str(row["Id"]))
+        return libraries
+
     # ------------------------------------------------------------------ #
     # 动作：加载媒体库（结果写入 storage）
     # ------------------------------------------------------------------ #
@@ -279,13 +304,7 @@ class Plugin(BasePlugin):
         server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
         if not server_id:
             raise ValueError("请先在设置中授权 Emby 服务器")
-        result = ctx.mt.emby.request(
-            server_id=server_id,
-            path="/Library/SelectableMediaFolders",
-        ) or {}
-        if result.get("status") != 200:
-            raise ValueError(f"Emby 返回 HTTP {result.get('status')}")
-        data = result.get("data") or []
+        data = self._cover_libraries(ctx, server_id)
         opts = _to_options(data, "Name", "Id")
         ctx.mt.storage.set(key="libraries", value=opts)
         ctx.mt.storage.set(key="active-server", value=server_id)
@@ -736,10 +755,7 @@ class Plugin(BasePlugin):
         server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
         if not server_id:
             raise ValueError("请先在设置中授权 Emby 服务器")
-        result = ctx.mt.emby.request(
-            server_id=server_id, path="/Library/SelectableMediaFolders") or {}
-        rows = result.get("data") or [] if result.get("status") == 200 else []
-        libs = [r for r in rows if isinstance(r, dict) and r.get("Id") is not None]
+        libs = self._cover_libraries(ctx, server_id)
         if not libs:
             raise ValueError("未读取到媒体库")
         # 页面多选媒体库：传了 libraryIds 就只处理所选；未传（“一键生成全部”）处理全部。

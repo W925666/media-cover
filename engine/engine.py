@@ -929,6 +929,64 @@ class PosterEngine:
         )
         return value[:split_at].strip() + '\n' + value[split_at:].strip()
 
+    # 各动态布局以 1920×1080 保存的像素参数及 render() 的默认值。
+    # 必须按布局列举：九宫格 title_y 是百分比，扇形 title_offset_y 才是像素；
+    # poster_scale/card_scale 等比例已由布局使用，不应再次乘分辨率比例。
+    _DYNAMIC_LAYOUT_PIXELS = {
+        '经典堆叠(动态)': {
+            'blur_radius': 0, 'poster_gap': 140, 'poster_radius': 20,
+            'shadow_blur': 15, 'shadow_offset': 10, 'gap_1': 20,
+        },
+        '经典平铺(动态)': {
+            'blur_radius': 0, 'poster_corner_radius': 12,
+            'active_border_width': 4, 'shadow_blur': 14,
+            'poster_spacing': 18, 'text_gap': 20,
+        },
+        '聚焦(动态)': {
+            'bg_blur': 0, 'corner_radius': 16,
+            'title_y_offset': -80, 'subtitle_offset_y': 20,
+        },
+        '扇形展开(动态)': {
+            'bg_blur': 0, 'fan_radius': 850, 'layout_y_offset': 491,
+            'poster_corner_radius': 15, 'shadow_blur': 20,
+            'title_offset_y': -400, 'subtitle_offset_y': -171,
+        },
+        '旋转(动态)': {
+            'bg_blur': 0, 'shadow_blur': 20, 'shadow_offset_x': 15,
+            'shadow_offset_y': 20, 'card_radius': 40,
+            'layer_offset_x': 0, 'layer_offset_y': 0,
+        },
+        '经典九宫格(动态)': {
+            'bg_blur': 0, 'cell_width': 410, 'cell_height': 610,
+            'corner_radius': 46, 'start_x': 350, 'start_y': -200,
+            'col_spacing': 50, 'row_spacing': 22, 'column_lift': -80,
+            'shadow_blur': 15,
+        },
+    }
+
+    @classmethod
+    def _dynamic_render_config(cls, config, engine_type, render_scale):
+        """复制并仅转换像素单位；有符号位移/零值不作正数钳制。"""
+        result = dict(config)
+        defaults = cls._DYNAMIC_LAYOUT_PIXELS.get(engine_type, {})
+        # 保留旧动态调用支持的通用像素键，布局默认值优先。
+        pixels = {key: config[key] for key in (
+            'badge_size', 'shadow_blur', 'shadow_offset_x', 'shadow_offset_y',
+            'card_radius', 'layer_offset_x', 'layer_offset_y',
+        ) if key in config}
+        pixels.update(defaults)
+        pixels.update({'title_size': 160, 'subtitle_size': 80, 'count_size': 40})
+        for key, default in pixels.items():
+            try:
+                value = round(float(config.get(key, default)) * render_scale)
+                # 字号需要至少一个像素，坐标/圆角/模糊则必须保留 0 和负值。
+                result[key] = max(1, value) if key in (
+                    'title_size', 'subtitle_size', 'count_size', 'badge_size',
+                ) else value
+            except (TypeError, ValueError, OverflowError):
+                pass
+        return result
+
     # === 动态 GIF 生成 ===
     def draw(self, config, assets):
         config = dict(config)
@@ -984,17 +1042,7 @@ class PosterEngine:
             target_h = round(target_w * 9 / 16)
             render_bg = bg.resize((target_w, target_h), Image.LANCZOS)
             render_scale = target_w / 1920.0
-            dynamic_config = dict(config)
-            for key in (
-                'title_size', 'subtitle_size', 'count_size', 'badge_size',
-                'shadow_blur', 'shadow_offset_x', 'shadow_offset_y',
-                'card_radius', 'layer_offset_x', 'layer_offset_y',
-            ):
-                if key in dynamic_config:
-                    try:
-                        dynamic_config[key] = max(1, round(float(dynamic_config[key]) * render_scale))
-                    except (TypeError, ValueError):
-                        pass
+            dynamic_config = self._dynamic_render_config(config, engine_type, render_scale)
             dynamic_fonts = {
                 'main': self._load_text_font(
                     dynamic_config.get('font_title'),
