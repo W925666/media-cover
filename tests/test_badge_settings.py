@@ -6,12 +6,11 @@ from test_plugin import plugin
 KEYS=('badgeBgColor','badgeXPercent','badgeYPercent','badgeOpacity','badgeBorderOpacity','badgeEffectStrength')
 
 @pytest.mark.parametrize('key',KEYS)
-def test_badge_settings_persist_and_all_buttons_forward(key):
-    assert key in plugin.GENERATION_SETTING_KEYS
+def test_advanced_badge_settings_use_layout_defaults_not_ui(key):
+    assert key not in plugin.GENERATION_SETTING_KEYS
     source=inspect.getsource(plugin)
-    # Single, batch, and explicit save all forward the selected state.
-    assert source.count('"'+key+'": ui.ref("state.'+key+'")')==3
-    assert 'bind="state.'+key+'"'in source
+    assert '"'+key+'": ui.ref("state.'+key+'")' not in source
+    assert 'bind="state.'+key+'"' not in source
 
 
 def test_badge_effect_translated_to_engine():
