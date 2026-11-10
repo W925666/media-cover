@@ -224,34 +224,46 @@ def render(ctx, bg, config, assets, fonts):
     # 按真实文字像素测量保留区；整组海报统一下移，字号和扇形结构不变。
     text_bounds = text_layer.getbbox()
     safe_top = text_bounds[3] + max(16, canvas_h // 45) if text_bounds else 0
-    poster_top = min(item['y'] + item['h'] / 2 - (
-        abs(item['w'] * math.sin(math.radians(item['angle']))) +
-        abs(item['h'] * math.cos(math.radians(item['angle'])))
-    ) / 2 for item in render_list)
-    poster_shift = max(0, safe_top - poster_top)
-    for item in render_list:
-        item['y'] += poster_shift
+    def prepared_cards():
+        for item in render_list:
+            source = ctx.download_img(item['url'])
+            if source is None:
+                continue
+            img = add_rounded_corners(source.resize((item['w'], item['h']), Image.LANCZOS), 15)
+            source.close()
+            group, _ = create_shadow_and_reflection_group(img, ref_op, 20 if item['z'] == 0 else 10)
+            img.close()
+            card = group.rotate(-item['angle'], resample=Image.BICUBIC, expand=True)
+            group.close()
+            x = int(item['x'] - card.width / 2)
+            y = int(item['y'] - card.height / 2 + item['h'] / 2)
+            yield card, x, y
 
-    # 4. 绘制海报
-    for item in render_list:
-        img = ctx.download_img(item['url'])
-        if not img: continue
-
-        img = img.resize((item['w'], item['h']), Image.LANCZOS)
-        img = add_rounded_corners(img, 15)
-
-        s_blur = 20 if item['z'] == 0 else 10
-        group, center_pt = create_shadow_and_reflection_group(img, ref_op, s_blur)
-
-        rotated_group = group.rotate(-item['angle'], resample=Image.BICUBIC, expand=True)
-
-        rw, rh = rotated_group.size
-        offset_y_fix = (item['h'] / 2)
-
-        paste_x = int(item['x'] - rw / 2)
-        paste_y = int(item['y'] - rh / 2 + offset_y_fix)
-
-        bg.paste(rotated_group, (paste_x, paste_y), mask=rotated_group)
+    # 必须测最终旋转合成的alpha，而不是本体矩形；测量发生在画布裁切前。
+    # 小图缓存避免动画逐帧重复旋转；超过8MiB则释放并第二遍逐张生成。
+    cached, cached_bytes, regenerate, tops = [], 0, False, []
+    for card, x, y in prepared_cards():
+        alpha = card.getchannel('A')
+        bounds = alpha.getbbox()
+        alpha.close()
+        if bounds:
+            tops.append(y + bounds[1])
+        size = card.width * card.height * 4
+        if not regenerate and cached_bytes + size <= 8 * 1024 * 1024:
+            cached.append((card, x, y))
+            cached_bytes += size
+        else:
+            if not regenerate:
+                for old, _, _ in cached:
+                    old.close()
+                cached.clear()
+            regenerate = True
+            card.close()
+    poster_shift = max(0, math.ceil(safe_top - min(tops))) if tops else 0
+    cards = prepared_cards() if regenerate else cached
+    for card, x, y in cards:
+        bg.paste(card, (x, y + poster_shift), mask=card)
+        card.close()
 
     bg.alpha_composite(text_layer)
 

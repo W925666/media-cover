@@ -152,32 +152,59 @@ def _draw_fan(ctx, canvas, config, pairs, active_index, progress=0.0):
         })
 
     safe_top = config.get("_text_safe_top", 0)
-    poster_top = min(item["y"] + item["height"] / 2 - (
-        abs(item["width"] * math.sin(math.radians(item["angle"]))) +
-        abs(item["height"] * math.cos(math.radians(item["angle"])))
-    ) / 2 for item in render_queue)
-    for item in render_queue:
-        item["y"] += max(0, safe_top - poster_top)
-
     render_queue.sort(key=lambda item: item["distance"], reverse=True)
-    for item in render_queue:
-        poster = ctx.download_img(item["url"])
-        if poster is None:
-            continue
-        poster = add_rounded_corners(
-            poster.resize((item["width"], item["height"]), Image.LANCZOS),
-            corner_radius,
-        )
-        card = create_card_group(
-            poster,
-            reflection_opacity,
-            shadow_blur if item["distance"] == 0 else max(4, shadow_blur // 2),
-        )
-        card = _with_opacity(card, item["opacity"])
-        card = card.rotate(-item["angle"], resample=Image.BICUBIC, expand=True)
-        paste_x = int(item["x"] - card.width / 2)
-        paste_y = int(item["y"] - card.height / 2 + item["height"] / 2)
-        canvas.alpha_composite(card, (paste_x, paste_y))
+
+    def prepared_cards():
+        for item in render_queue:
+            if item["opacity"] <= 0:
+                continue
+            source = ctx.download_img(item["url"])
+            if source is None:
+                continue
+            resized = source.resize((item["width"], item["height"]), Image.LANCZOS)
+            source.close()
+            poster = add_rounded_corners(resized, corner_radius)
+            resized.close()
+            group = create_card_group(
+                poster, reflection_opacity,
+                shadow_blur if item["distance"] == 0 else max(4, shadow_blur // 2),
+            )
+            poster.close()
+            faded = _with_opacity(group, item["opacity"])
+            card = faded.rotate(-item["angle"], resample=Image.BICUBIC, expand=True)
+            if faded is not group:
+                faded.close()
+            group.close()
+            x = int(item["x"] - card.width / 2)
+            y = int(item["y"] - card.height / 2 + item["height"] / 2)
+            yield card, x, y
+
+    # 最终card的alpha包含阴影/倒影，且旋转中心不是本体中心。
+    # 在未被canvas裁切的card上测量，整组统一移动，保留扇形相对位置。
+    # 533px动画缓存通常不足1MiB；高清超过8MiB后改用两pass释放重建。
+    cached, cached_bytes, regenerate, tops = [], 0, False, []
+    for card, x, y in prepared_cards():
+        alpha = card.getchannel("A")
+        bounds = alpha.getbbox()
+        alpha.close()
+        if bounds:
+            tops.append(y + bounds[1])
+        size = card.width * card.height * 4
+        if not regenerate and cached_bytes + size <= 8 * 1024 * 1024:
+            cached.append((card, x, y))
+            cached_bytes += size
+        else:
+            if not regenerate:
+                for old, _, _ in cached:
+                    old.close()
+                cached.clear()
+            regenerate = True
+            card.close()
+    shift = max(0, math.ceil(safe_top - min(tops))) if tops else 0
+    cards = prepared_cards() if regenerate else cached
+    for card, x, y in cards:
+        canvas.alpha_composite(card, (x, y + shift))
+        card.close()
     return canvas
 
 
