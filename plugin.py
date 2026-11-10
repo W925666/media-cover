@@ -101,6 +101,13 @@ def _generation_input(input: dict | None, ctx: Context) -> dict:
     merged = {k: saved[k] for k in GENERATION_SETTING_KEYS
               if isinstance(saved, dict) and k in saved and saved[k] is not None}
     merged.update(input or {})  # 保留显式的 False、空字符串和 None（重置默认值）。
+    # 宿主开始任务后会重载页面；先持久化本次选择，避免 state 回到旧默认布局。
+    explicit = {k: v for k, v in (input or {}).items()
+                if k in GENERATION_SETTING_KEYS and v is not None}
+    if explicit:
+        settings = dict(saved) if isinstance(saved, dict) else {}
+        settings.update(explicit)
+        ctx.mt.storage.set(key="ui-settings", value=settings)
     if merged.get("serverId") in (None, ""):
         active = _storage_value(ctx.mt.storage.get(key="active-server"))
         if active not in (None, ""):

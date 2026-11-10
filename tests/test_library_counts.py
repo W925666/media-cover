@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 import pytest
-from test_plugin import plugin
+from test_plugin import plugin, FakeCtx
 from PIL import Image, ImageChops, ImageFont
 from pathlib import Path
 from engine import PosterEngine
@@ -32,6 +32,16 @@ def test_missing_total_never_uses_candidate_count(raw,expected):
 def test_count_http_failure_is_unknown():
     ctx=SimpleNamespace(mt=SimpleNamespace(emby=SimpleNamespace(request=lambda **kw:{'status':500,'data':{}}),log=lambda **kw:None))
     assert plugin.Plugin()._fetch_library_count(ctx,'s','l','movies') is None
+
+def test_generation_persists_selection_without_target_scope():
+    ctx=FakeCtx()
+    ctx.mt.storage.set(key='ui-settings',value={'layout':'扇形展开','fontTitle':'old'})
+    plugin._generation_input({'layout':'经典九宫格','fontTitle':'new','showSubtitle':False,'libraryId':'secret-target','upload':True},ctx)
+    saved=ctx.mt.storage.get('ui-settings')['value']
+    assert saved['layout']=='经典九宫格' and saved['fontTitle']=='new'
+    assert saved['showSubtitle'] is False
+    assert 'libraryId'not in saved and 'upload'not in saved
+    assert plugin._generation_input({},ctx)['layout']=='经典九宫格'
 
 def test_zero_count_draws_but_unknown_does_not():
     root=Path(__file__).resolve().parents[1]
