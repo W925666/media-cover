@@ -282,5 +282,6 @@ def render(ctx, bg, config, assets, fonts, step=0.0):
     transition_ms = max(100, min(switch_interval - 100, int(config.get("transition_ms", 500))))
     current, upcoming, slide = _timeline_state(step, len(pairs), transition_ms / switch_interval)
     canvas = _background_for_state(ctx, bg, config, pairs, current, upcoming, slide)
-    canvas = _draw_overlay_and_text(ctx, canvas, config, fonts)
-    return _draw_carousel(ctx, canvas, config, pairs, current, slide)
+    canvas = _draw_carousel(ctx, canvas, config, pairs, current, slide)
+    # 海报及其阴影先合成；文字区遮罩和正文始终位于最终前景。
+    return _draw_overlay_and_text(ctx, canvas, config, fonts)

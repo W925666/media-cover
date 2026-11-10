@@ -122,6 +122,7 @@ def _draw_focus_stage(ctx, canvas, config, pairs, active_index):
     hero_height = int(height * (float(config.get("hero_height_percent", 51)) / 100))
     hero_width = int(hero_height * float(config.get("poster_ratio", 0.66)))
     baseline = int(height * (float(config.get("baseline_percent", 94)) / 100))
+    baseline += int(config.get('_poster_clearance_shift', 0))
     scale_step = float(config.get("side_scale_step", 0.9))
     overlap = float(config.get("overlap_percent", 40)) / 100
     darken_step = int(config.get("perspective_darken", 40))
@@ -234,8 +235,19 @@ def _draw_text(ctx, canvas, config, fonts):
 
 def _render_state(ctx, fallback, config, pairs, fonts, active_index):
     canvas = _state_background(ctx, fallback, config, pairs[active_index])
-    canvas = _draw_focus_stage(ctx, canvas, config, pairs, active_index)
-    return _draw_text(ctx, canvas, config, fonts)
+    # 在背景之外测量正文真实墨迹，只避让前景海报本体，背景叠字属于设计。
+    text_layer = Image.new('RGBA', canvas.size)
+    _draw_text(ctx, text_layer, config, fonts)
+    bounds = text_layer.getbbox()
+    hero_height = int(canvas.height * float(config.get('hero_height_percent', 51)) / 100)
+    hero_top = int(canvas.height * float(config.get('baseline_percent', 94)) / 100) - hero_height
+    frame_config = dict(config)
+    if bounds and bounds[3] > hero_top:
+        frame_config['_poster_clearance_shift'] = bounds[3] + max(4, canvas.height // 100) - hero_top
+    canvas = _draw_focus_stage(ctx, canvas, frame_config, pairs, active_index)
+    canvas.alpha_composite(text_layer)
+    text_layer.close()
+    return canvas
 
 
 def get_schema():

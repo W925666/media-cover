@@ -207,6 +207,15 @@ def render(ctx, bg, config, assets, fonts):
 
     render_queue.sort(key=lambda item: item['z_index'])
 
+    # 文字先按旧锚点绘制到独立层；只在真实墨迹侵入C位本体时统一下移海报组。
+    text_layer = Image.new('RGBA', bg.size)
+    _draw_text(ctx, text_layer, config, fonts, base_y, hero_h)
+    text_bounds = text_layer.getbbox()
+    if text_bounds and text_bounds[3] > base_y - hero_h:
+        shift = text_bounds[3] + max(4, canvas_h // 100) - (base_y - hero_h)
+        for item in render_queue:
+            item['y'] += shift
+
     # --- 4. 渲染海报 ---
     for item in render_queue:
         img = ctx.download_img(item['url'])
@@ -241,7 +250,13 @@ def render(ctx, bg, config, assets, fonts):
 
         bg.paste(img, (paste_x, paste_y), mask=img)
 
-    # --- 5. 绘制文字 (新增副标题支持) ---
+    bg.alpha_composite(text_layer)
+    return bg
+
+
+def _draw_text(ctx, bg, config, fonts, base_y, hero_h):
+    canvas_w, canvas_h = bg.size
+    # 保留原版文字锚点、字号、换行与主副间距。
     draw = ImageDraw.Draw(bg)
 
     f_title = fonts.get('font_title') or fonts.get('main')

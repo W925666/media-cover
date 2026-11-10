@@ -125,14 +125,21 @@ def create_gradient_text(text, font, color_top, color_bottom, spacing=0):
         bbox = font.getbbox(text)
         total_h = bbox[3] - bbox[1] + 10
 
-    canvas_w = total_w + 10
-    canvas_h = total_h + 20
-    mask = Image.new('L', (canvas_w, canvas_h), 0)
-    draw = ImageDraw.Draw(mask)
+    positions = []
     curr_x = 0
     for i, char in enumerate(text):
-        draw.text((curr_x, 0), char, font=font, fill=255)
+        positions.append((curr_x, char))
         curr_x += widths[i] + spacing
+    boxes = [font.getbbox(char) for _, char in positions]
+    left = min(0, math.floor(min(x + b[0] for (x, _), b in zip(positions, boxes))))
+    top = min(0, math.floor(min(b[1] for b in boxes)))
+    right = max(total_w + 10, math.ceil(max(x + b[2] for (x, _), b in zip(positions, boxes))))
+    bottom = max(total_h + 20, math.ceil(max(b[3] for b in boxes)))
+    canvas_w, canvas_h = right - left, bottom - top
+    mask = Image.new('L', (canvas_w, canvas_h), 0)
+    draw = ImageDraw.Draw(mask)
+    for x, char in positions:
+        draw.text((x - left, -top), char, font=font, fill=255)
 
     c1 = ImageColor.getrgb(color_top)
     c2 = ImageColor.getrgb(color_bottom)
@@ -141,6 +148,7 @@ def create_gradient_text(text, font, color_top, color_bottom, spacing=0):
     grad_src.putpixel((0, 1), c2)
     gradient_img = grad_src.resize((canvas_w, canvas_h), Image.BICUBIC)
     gradient_img.putalpha(mask)
+    gradient_img.info['text_origin_offset'] = (left, top)
     return gradient_img, total_w, total_h
 
 def draw_text_simple(draw, text, center_x, y, font, color, spacing=0, stroke_width=0, stroke_fill=None):
@@ -409,7 +417,9 @@ def render(ctx, bg, config, assets, fonts):
 
         draw_text_simple(draw, t_str, center_x, t_y, t_font, '#B8860B', spacing=t_spacing, stroke_width=4, stroke_fill='#B8860B')
         grad_img, gw, gh = create_gradient_text(t_str, t_font, config.get('title_gradient_top', '#FFF8DC'), config.get('title_gradient_bottom', '#DAA520'), spacing=t_spacing)
-        if grad_img: bg.paste(grad_img, (int(center_x - gw // 2), int(t_y)), mask=grad_img)
+        if grad_img:
+            gx, gy = grad_img.info.get('text_origin_offset', (0, 0))
+            bg.paste(grad_img, (int(center_x - gw // 2) + gx, int(t_y) + gy), mask=grad_img)
 
         # --- 副标题 (应用描边参数) ---
         s_str = config.get('subtitle', 'CHINESE MOVIES')

@@ -86,7 +86,7 @@ def _glyph_signature(font, char):
 
 
 def _font_supports_text(font, text):
-    characters = {char for char in str(text or "") if ord(char) > 127 and not char.isspace()}
+    characters = {char for char in str(text or "") if not char.isspace()}
     if not characters:
         return True
     try:
@@ -251,6 +251,18 @@ def _element_image(ctx, element, assets, config):
                 x = 2
             text_positions.append((x, y, line))
             y += line_height
+        # 字体bearings可能大于名义行高；在元素容得下完整墨迹时平移原点，
+        # 不缩字号、不改变换行，也不擅自扩展用户明确设置的图层大小。
+        ink_boxes = [draw.textbbox((x, y), line, font=font, stroke_width=stroke_width)
+                     for x, y, line in text_positions if line.strip()]
+        if ink_boxes:
+            left = min(b[0] for b in ink_boxes)
+            top = min(b[1] for b in ink_boxes)
+            right = max(b[2] for b in ink_boxes)
+            bottom = max(b[3] for b in ink_boxes)
+            dx = max(-left, min(0, width - right)) if right - left <= width else 0
+            dy = max(-top, min(0, height - bottom)) if bottom - top <= height else 0
+            text_positions = [(x + dx, y + dy, line) for x, y, line in text_positions]
         if element.get("colorMode", "solid") == "gradient":
             mask = Image.new("L", (width, height), 0)
             mask_draw = ImageDraw.Draw(mask)

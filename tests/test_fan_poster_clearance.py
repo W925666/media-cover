@@ -8,6 +8,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from engine import PosterEngine
 
+FONT_NAMES = sorted(p.name for p in (ROOT/'fonts').iterdir() if p.suffix.lower() in ('.ttf', '.otf'))
+FONT_PAIRS = [(name, name) for name in FONT_NAMES] + [('料事如神SentyZHAO.ttf', '方正字迹-鸿飞汉魏简体.TTF')]
+
+@pytest.fixture(params=FONT_PAIRS, ids=[a if a == b else 'screenshot-mixed' for a, b in FONT_PAIRS])
+def font_pair(request):
+    return request.param
+
 @pytest.fixture(scope='module')
 def engine():
     return PosterEngine(fonts_dir=str(ROOT/'fonts'), layouts_dir=str(ROOT/'layouts'))
@@ -28,21 +35,24 @@ class Context:
         self.engine.draw_text_wrapper(ImageDraw.Draw(self.text), text, x, y, font, width, fill, **kw)
         return self.engine.draw_text_wrapper(draw, text, x, y, font, width, fill, **kw)
 
-def config_and_fonts(engine, layout, size):
+def config_and_fonts(engine, layout, size, font_pair):
     name='preset_1785762000000.json' if '(动态)' in layout else 'preset_1769089761543.json'
     config=json.loads((ROOT/'templates'/name).read_text())['config']
     config.update(title='国产剧',subtitle='TV SHOWS',title_size=200,subtitle_size=100,
                   bg_blur=0,bg_darkness=0)
     if size[0]!=1920:
         config=engine._dynamic_render_config(config,layout,size[0]/1920)
-    fonts={'main':engine._load_text_font('料事如神SentyZHAO.ttf',config['title_size'],'国产剧'),
-           'sub':engine._load_text_font('方正字迹-鸿飞汉魏简体.TTF',config['subtitle_size'],'TV SHOWS')}
+    fonts={'main':engine._load_text_font(font_pair[0],config['title_size'],'国产剧'),
+           'sub':engine._load_text_font(font_pair[1],config['subtitle_size'],'TV SHOWS')}
+    for role, text in [('main', '国产剧'), ('sub', 'TV SHOWS')]:
+        assert not engine._font_missing_characters(fonts[role], text)
+        assert fonts[role].getmask(text).getbbox(), (font_pair, role, 'empty ink')
     return config, fonts
 
 @pytest.mark.parametrize('count',[3,5,9])
-def test_static_final_card_alpha_stays_below_text(engine, monkeypatch, count):
+def test_static_final_card_alpha_stays_below_text(engine, monkeypatch, count, font_pair):
     size=(1920,1080);ctx=Context(engine,size,no_background=True)
-    config,fonts=config_and_fonts(engine,'扇形展开',size)
+    config,fonts=config_and_fonts(engine,'扇形展开',size,font_pair)
     # 压力位置强制触发真实避让，而非默认布局下偶然已有空白。
     config.update(poster_count=count,layout_y_offset=100)
     records=[];original=Image.Image.paste
@@ -61,9 +71,9 @@ def test_static_final_card_alpha_stays_below_text(engine, monkeypatch, count):
 
 @pytest.mark.parametrize('count',[3,5,9])
 @pytest.mark.parametrize('progress',[0,.25,.5,.9,1])
-def test_533_dynamic_real_alpha_clearance_and_uniform_shift(engine,monkeypatch,count,progress):
+def test_533_dynamic_real_alpha_clearance_and_uniform_shift(engine,monkeypatch,count,progress,font_pair):
     size=(533,300);ctx=Context(engine,size)
-    config,fonts=config_and_fonts(engine,'扇形展开(动态)',size)
+    config,fonts=config_and_fonts(engine,'扇形展开(动态)',size,font_pair)
     config.update(poster_count=count,layout_y_offset=28)
     scope=engine.layout_modules['扇形展开(动态)'].__globals__
     scope['_draw_text'](ctx,Image.new('RGBA',size),config,fonts)
