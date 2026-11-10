@@ -13,6 +13,9 @@ __pycache__/
 # 构建产物（ZIP 可单独在 releases 上传，不入库）
 dist/
 
+# 字体完整原件固定在历史提交；发行包按任务远程下载
+fonts/
+
 # 系统
 .DS_Store
 Thumbs.db

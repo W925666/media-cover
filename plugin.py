@@ -19,6 +19,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
+from font_runtime import temporary_fonts, catalog as font_catalog
 
 from mt_plugin import Plugin as BasePlugin, Context, action, query
 from mt_plugin import ui
@@ -508,6 +509,7 @@ class Plugin(BasePlugin):
     # 动作：生成封面并上传到 Emby 条目
     # ------------------------------------------------------------------ #
     @action("generate-cover")
+    @temporary_fonts
     def generate_cover(self, input: dict, ctx: Context):
         input = _generation_input(input, ctx)
         _sid = input.get("serverId")
@@ -776,6 +778,7 @@ class Plugin(BasePlugin):
 
     # ------------------------------------------------------------------ #
     @action("generate-all")
+    @temporary_fonts
     def generate_all(self, input: dict, ctx: Context):
         """一键生成媒体库封面（参考 cover-studio 的 generate 动作）。
 
@@ -937,10 +940,7 @@ class Plugin(BasePlugin):
         import os as _os
         fonts_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "fonts")
         try:
-            names = sorted(
-                n for n in _os.listdir(fonts_dir)
-                if n.lower().endswith((".ttf", ".otf"))
-            )
+            names = sorted(row['name'] for row in font_catalog())
         except OSError:
             return []
         return [{"label": "跟随当前布局默认字体", "value": ""}] + [{"label": n, "value": n} for n in names]
