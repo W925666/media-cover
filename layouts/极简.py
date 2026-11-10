@@ -103,9 +103,26 @@ def render(ctx, bg, config, assets, fonts):
     c_title = ctx.resolve_text_fill(config, 'title', '#FFFFFF')
     c_sub = ctx.resolve_text_fill(config, 'subtitle', '#DDDDDD')
 
+    # 默认文字组能放进画布时，只平移超出底部的部分，不缩字号。
+    title = config.get('title', '')
+    subtitle = config.get('subtitle', '')
+    if title and subtitle and callable(getattr(ctx, 'wrapped_text_ink_bbox', None)):
+        try:
+            advance = sum(f_title.getmetrics()) + 10
+        except AttributeError:
+            box = f_title.getbbox('Hg')
+            advance = box[3] - box[1] + 10
+        sub_y = cy + len(ctx._wrapped_text_lines(title, f_title, mw)) * advance + int(config.get('gap_1', 30))
+        main_box = ctx.wrapped_text_ink_bbox(title, cx, cy, f_title, mw, align=align)
+        sub_box = ctx.wrapped_text_ink_bbox(subtitle, cx, sub_y, f_sub, mw, align=align)
+        boxes = [b for b in (main_box, sub_box) if b]
+        if boxes:
+            shift = max(0, max(b[3] for b in boxes) - height)
+            if min(b[1] for b in boxes) - shift >= 0:
+                cy -= shift
+
     # 1. 主标题
     # draw_text_wrapper 通常返回绘制结束后的 Y 坐标
-    title = config.get('title', '')
     if title:
         cy = ctx.draw_text_wrapper(draw, title, cx, cy, f_title, mw, c_title, align=align)
         # 间距

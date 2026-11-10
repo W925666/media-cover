@@ -84,6 +84,12 @@ def create_radial_mask(size, radius_scale=1.0, intensity=1.0):
 # =============================================================================
 
 def get_font_obj(fonts, config_font_name, size, fallback_key='main'):
+    # 引擎已按实际文本解析缺字回退；不能再优先打开原始请求文件覆盖它。
+    if fallback_key and fonts.get(fallback_key):
+        resolved = fonts[fallback_key]
+        if hasattr(resolved, 'path'):
+            return ImageFont.truetype(resolved.path, size)
+        return resolved
     font_file = config_font_name
     if fonts.get(font_file):
         f = fonts.get(font_file)

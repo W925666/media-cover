@@ -249,36 +249,47 @@ def _draw_text(ctx, canvas, config, fonts):
     title = config.get("title", "")
     subtitle = config.get("subtitle", "")
     shadow_opacity = int(config.get("text_shadow_opacity", 100))
+    tx = int(width * float(config.get("title_pos_x", 6)) / 100)
+    ty = int(height * float(config.get("title_pos_y", 38)) / 100)
+    title_width = int(width * float(config.get("title_width_pct", 40)) / 100)
+    sx = int(width * float(config.get("subtitle_pos_x", 6)) / 100)
+    sy = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
+    subtitle_width = int(width * float(config.get("sub_width_pct", 40)) / 100)
+    # 保留 metrics 驱动的相对位置，再按实际墨迹整体上移；旧 fake ctx 走原路径。
+    if title and subtitle and callable(getattr(ctx, "wrapped_text_ink_bbox", None)) and callable(getattr(ctx, "_wrapped_text_lines", None)):
+        if title:
+            try:
+                advance = sum(title_font.getmetrics()) + 10
+            except AttributeError:
+                box = title_font.getbbox("Hg")
+                advance = box[3] - box[1] + 10
+            title_end_y = ty + len(ctx._wrapped_text_lines(title, title_font, title_width)) * advance
+            sy = max(sy, title_end_y + 10)
+        bottoms = []
+        for text, x, y, font, max_width, shadow_offset in (
+            (title, tx, ty, title_font, title_width, 3),
+            (subtitle, sx, sy, subtitle_font, subtitle_width, 2),
+        ):
+            box = ctx.wrapped_text_ink_bbox(text, x, y, font, max_width)
+            if box:
+                bottoms.append(box[3] + (shadow_offset if shadow_opacity > 0 else 0))
+        # 超高文字组仍可能超出上边界；只平移，不缩字或改变换行。
+        shift = max(0, max(bottoms, default=height) - height)
+        ty -= shift
+        sy -= shift
     if title:
-        x = int(width * float(config.get("title_pos_x", 6)) / 100)
-        y = int(height * float(config.get("title_pos_y", 38)) / 100)
-        max_width = int(width * float(config.get("title_width_pct", 40)) / 100)
         if shadow_opacity > 0:
-            ctx.draw_text_wrapper(draw, title, x + 3, y + 3, title_font, max_width, (0, 0, 0, shadow_opacity))
+            ctx.draw_text_wrapper(draw, title, tx + 3, ty + 3, title_font, title_width, (0, 0, 0, shadow_opacity))
         title_end_y = ctx.draw_text_wrapper(
-            draw,
-            title,
-            x,
-            y,
-            title_font,
-            max_width,
+            draw, title, tx, ty, title_font, title_width,
             ctx.resolve_text_fill(config, "title", "#FFFFFF", config.get("title_opacity", 255)),
         )
+        sy = max(sy, title_end_y + 10)
     if subtitle:
-        x = int(width * float(config.get("subtitle_pos_x", 6)) / 100)
-        y = int(height * float(config.get("subtitle_pos_y", 55)) / 100)
-        if title:
-            y = max(y, title_end_y + 10)
-        max_width = int(width * float(config.get("sub_width_pct", 40)) / 100)
         if shadow_opacity > 0:
-            ctx.draw_text_wrapper(draw, subtitle, x + 2, y + 2, subtitle_font, max_width, (0, 0, 0, shadow_opacity))
+            ctx.draw_text_wrapper(draw, subtitle, sx + 2, sy + 2, subtitle_font, subtitle_width, (0, 0, 0, shadow_opacity))
         ctx.draw_text_wrapper(
-            draw,
-            subtitle,
-            x,
-            y,
-            subtitle_font,
-            max_width,
+            draw, subtitle, sx, sy, subtitle_font, subtitle_width,
             ctx.resolve_text_fill(config, "subtitle", "#DDDDDD", config.get("subtitle_opacity", 210)),
         )
     return canvas

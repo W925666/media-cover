@@ -212,6 +212,11 @@ def render(ctx, bg, config, assets, fonts):
         sub_y = (canvas_h // 2) + sub_offset_y
         if title:
             sub_y = max(sub_y, title_end_y + 10)
+            if hasattr(ctx, 'wrapped_text_ink_bbox'):
+                title_box = ctx.wrapped_text_ink_bbox(title, canvas_w // 2, text_y, f_title, canvas_w, align='center')
+                subtitle_box = ctx.wrapped_text_ink_bbox(subtitle, canvas_w // 2, 0, f_sub, canvas_w, align='center')
+                if title_box and subtitle_box:
+                    sub_y = max(sub_y, math.ceil(title_box[3] + 10 - subtitle_box[1]))
 
         ctx.draw_text_wrapper(draw, subtitle, canvas_w // 2, sub_y, f_sub, canvas_w, c_sub, align='center')
 

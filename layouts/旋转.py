@@ -296,6 +296,11 @@ def render(ctx, bg, config, assets, fonts):
         )
     bg = Image.alpha_composite(bg, cards_canvas)
 
+    return _draw_text(ctx, bg, config, fonts)
+
+
+def _draw_text(ctx, bg, config, fonts):
+    width, height = bg.size
     # --- 3. 绘制文字 (独立坐标) ---
     draw = ImageDraw.Draw(bg)
 
@@ -320,6 +325,29 @@ def render(ctx, bg, config, assets, fonts):
     sx = int(width * (float(config.get('subtitle_pos_x', 15)) / 100))
     sy = int(height * (float(config.get('subtitle_pos_y', 55)) / 100))
     mw_sub = int(width * (float(config.get('sub_width_pct', 40)) / 100))
+
+    # 保留 metrics 驱动的相对位置，再按实际墨迹整体上移；旧 fake ctx 走原路径。
+    if title_str and subtitle_str and callable(getattr(ctx, 'wrapped_text_ink_bbox', None)) and callable(getattr(ctx, '_wrapped_text_lines', None)):
+        if title_str:
+            try:
+                advance = sum(f_title_path.getmetrics()) + 10
+            except AttributeError:
+                box = f_title_path.getbbox("Hg")
+                advance = box[3] - box[1] + 10
+            title_end_y = ty + len(ctx._wrapped_text_lines(title_str, f_title_path, mw_title)) * advance
+            sy = max(sy, title_end_y + 10)
+        bottoms = []
+        for text, x, y, font, max_width, shadow_offset in (
+            (title_str, tx, ty, f_title_path, mw_title, 3),
+            (subtitle_str, sx, sy, f_sub_path, mw_sub, 2),
+        ):
+            box = ctx.wrapped_text_ink_bbox(text, x, y, font, max_width)
+            if box:
+                bottoms.append(box[3] + (shadow_offset if shadow_op > 0 else 0))
+        # 超高文字组仍可能超出上边界；只平移，不缩字或改变换行。
+        shift = max(0, max(bottoms, default=height) - height)
+        ty -= shift
+        sy -= shift
 
     if title_str:
         if shadow_op > 0:

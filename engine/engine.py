@@ -161,7 +161,7 @@ class PosterEngine:
 
     @classmethod
     def _font_supports_text(cls, font, text):
-        characters = {char for char in str(text or "") if ord(char) > 127 and not char.isspace()}
+        characters = {char for char in str(text or "") if not char.isspace()}
         if not characters:
             return True
         try:
@@ -265,8 +265,7 @@ class PosterEngine:
                 continue
         return ImageFont.load_default()
 
-    def draw_text_wrapper(self, draw, text, x, y, font, max_width, fill, line_spacing=10, align='left'):
-        if not text: return y
+    def _wrapped_text_lines(self, text, font, max_width, warn=False):
         # 英文以单词为最小单位，中文仍逐字换行；保留显式换行与空行。
         # 连字符和撇号属于单词，避免把 Spider-Man / Children's 拆开。
         paragraphs = [
@@ -284,7 +283,7 @@ class PosterEngine:
         # 尊重调用方字号，不偷偷缩字或拆开英文单词。
         # 超长词保留完整绘制并记录警告，供预览/调用方决定扩大文本区或减小字号。
         tokens = [token for paragraph in paragraphs for token in paragraph if not token.isspace()]
-        if tokens and max(text_width(token) for token in tokens) > max_width:
+        if warn and tokens and max(text_width(token) for token in tokens) > max_width:
             logger.warning("文字中的完整单词超出文本区宽度（字号=%s，宽度=%s）：%s",
                            getattr(font, 'size', None), max_width, str(text))
 
@@ -306,6 +305,38 @@ class PosterEngine:
                 pending_space = ""
             lines.append(current_line)
 
+        return lines
+
+    def wrapped_text_ink_bbox(self, text, x, y, font, max_width, line_spacing=10, align='left'):
+        """与 wrapper 相同换行/基线的真实字形边界；不绘制、不重复输出日志。"""
+        if not text:
+            return None
+        try:
+            advance = sum(font.getmetrics()) + line_spacing
+        except AttributeError:
+            box = font.getbbox("Hg")
+            advance = box[3] - box[1] + line_spacing
+        boxes = []
+        for index, line in enumerate(self._wrapped_text_lines(text, font, max_width)):
+            if not line.strip():
+                continue
+            try:
+                width = font.getlength(line)
+            except AttributeError:
+                width = font.getbbox(line)[2]
+            left = x - width / 2 if align == 'center' else x - width if align == 'right' else x
+            box = font.getbbox(line)
+            if box[2] > box[0] and box[3] > box[1]:
+                baseline_y = y + index * advance
+                boxes.append((left + box[0], baseline_y + box[1], left + box[2], baseline_y + box[3]))
+        if not boxes:
+            return None
+        return (min(b[0] for b in boxes), min(b[1] for b in boxes),
+                max(b[2] for b in boxes), max(b[3] for b in boxes))
+
+    def draw_text_wrapper(self, draw, text, x, y, font, max_width, fill, line_spacing=10, align='left'):
+        if not text: return y
+        lines = self._wrapped_text_lines(text, font, max_width, warn=True)
         try: font_height = font.getmetrics()[0] + font.getmetrics()[1] + line_spacing
         except: bbox = font.getbbox("Hg"); font_height = (bbox[3] - bbox[1]) + line_spacing
         

@@ -203,6 +203,14 @@ def _draw_text(ctx, canvas, config, fonts):
         subtitle_y = height // 2 + int(config.get("subtitle_offset_y", -171))
         if title:
             subtitle_y = max(subtitle_y, title_end_y + 10)
+            if hasattr(ctx, 'wrapped_text_ink_bbox'):
+                title_box = ctx.wrapped_text_ink_bbox(
+                    title, width // 2, height // 2 + int(config.get('title_offset_y', -400)),
+                    title_font, width, align='center')
+                subtitle_box = ctx.wrapped_text_ink_bbox(
+                    subtitle, width // 2, 0, subtitle_font, width, align='center')
+                if title_box and subtitle_box:
+                    subtitle_y = max(subtitle_y, math.ceil(title_box[3] + 10 - subtitle_box[1]))
         ctx.draw_text_wrapper(
             draw,
             subtitle,
