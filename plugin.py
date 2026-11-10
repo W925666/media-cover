@@ -508,6 +508,33 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     # 动作：生成封面并上传到 Emby 条目
     # ------------------------------------------------------------------ #
+    def _prepare_font_input(self, action_name, input, ctx):
+        """Validate task scope before remote font downloads; share merged settings."""
+        merged = _generation_input(input, ctx)
+        sid = merged.get('serverId')
+        sid = str(sid) if sid not in (None, '') else self._first_server_id(ctx)
+        if not sid:
+            raise ValueError('请先在设置中授权 Emby 服务器')
+        merged['serverId'] = sid
+        if action_name == 'generate_all':
+            if 'libraryIds' in merged and not any(x not in (None, '') for x in (merged.get('libraryIds') or [])):
+                raise ValueError('请先选择媒体库（下拉框可多选）')
+            libraries = self._cover_libraries(ctx, sid)
+            if not libraries:
+                raise ValueError('未读取到媒体库')
+            if 'libraryIds' in merged:
+                wanted = {str(x) for x in merged['libraryIds']}
+                if not any(str(row.get('Id')) in wanted for row in libraries):
+                    raise ValueError('所选媒体库不在当前服务器列表中，请先加载/刷新媒体库')
+        elif not merged.get('targetId') and not merged.get('libraryId'):
+            result = ctx.mt.emby.request(server_id=sid, path='/Library/SelectableMediaFolders') or {}
+            rows = result.get('data') or [] if result.get('status') == 200 else []
+            first = next((row for row in rows if isinstance(row, dict) and row.get('Id') is not None), None)
+            if not first:
+                raise ValueError('请先选择媒体库')
+            merged['libraryId'] = str(first['Id'])
+        return merged
+
     @action("generate-cover")
     @temporary_fonts
     def generate_cover(self, input: dict, ctx: Context):

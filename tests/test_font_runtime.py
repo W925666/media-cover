@@ -47,13 +47,40 @@ def test_layout_fonts_and_saved_selection_are_downloaded(monkeypatch, tmp_path):
     monkeypatch.setattr(engine, 'PosterEngine', lambda **kw: SimpleNamespace(clear_image_cache=lambda: None))
     class Plugin:
         _engine = None
-        def _plugin_config(self, ctx): return {'fontTitle': 'config.ttf'}
+        def _plugin_config(self, ctx): return {'fontTitle': 'config.ttf', 'badgeFont': 'unused-invalid.ttf', 'fontCount': 'also-unused.ttf'}
         def _layout_defaults(self, layout):
             assert layout == '荣耀视界'
             return {'font_title': 'layout.ttf', 'font_subtitle': '字魂白鸽天行体(商用需授权).ttf'}
         @runtime.temporary_fonts
         def run(self, input, ctx): return True
-    ctx = SimpleNamespace(mt=SimpleNamespace(storage=SimpleNamespace(get=lambda **kw: {'found': True, 'value': {'fontTitle': 'saved.ttf', 'layout': '荣耀视界'}})))
+    ctx = SimpleNamespace(mt=SimpleNamespace(storage=SimpleNamespace(get=lambda **kw: {'found': True, 'value': {'fontTitle': 'saved.ttf', 'layout': '荣耀视界', 'fontCount': 'stale-unused.ttf'}})))
     assert Plugin().run({}, ctx)
     assert 'saved.ttf' in downloaded and 'config.ttf' not in downloaded
     assert 'layout.ttf' in downloaded and '字魂白鸽天行体.ttf' in downloaded
+
+
+def test_invalid_scope_fails_before_download(monkeypatch, tmp_path):
+    from test_plugin import plugin
+    monkeypatch.setattr(runtime, 'ROOT', tmp_path)
+    monkeypatch.setattr(runtime, 'catalog', lambda: pytest.fail('download preparation before validation'))
+    p = plugin.Plugin()
+    p._first_server_id = lambda ctx: None
+    ctx = SimpleNamespace(mt=SimpleNamespace(storage=SimpleNamespace(get=lambda **kw: {}, set=lambda **kw: None)))
+    with pytest.raises(ValueError, match='服务器'):
+        p.generate_cover({}, ctx)
+    with pytest.raises(ValueError, match='选择媒体库'):
+        p.generate_all({'serverId': 's', 'libraryIds': []}, ctx)
+
+
+def test_cleanup_only_dead_owned_directories(monkeypatch, tmp_path):
+    import os
+    monkeypatch.setattr(runtime.tempfile, 'gettempdir', lambda: str(tmp_path))
+    dead = tmp_path / 'cover-fonts-dead'
+    live = tmp_path / 'cover-fonts-live'
+    unknown = tmp_path / 'cover-fonts-unknown'
+    for d in (dead, live, unknown): d.mkdir()
+    (dead / '.owner').write_text('99999999')
+    (live / '.owner').write_text(str(os.getpid()))
+    runtime.cleanup_abandoned()
+    assert not dead.exists()
+    assert live.exists() and unknown.exists()
