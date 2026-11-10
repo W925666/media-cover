@@ -86,6 +86,28 @@ def _storage_value(data: Any) -> Any:
     return data.get("value")
 
 
+GENERATION_SETTING_KEYS = (
+    "sourceMode", "layout", "fontTitle", "fontSubtitle",
+    "badgeStyle", "badgeFont", "badgeSize", "posterCount",
+    "title", "subtitle", "titleSize", "subtitleSize", "titleColorMode", "titleColor",
+    "subtitleColorMode", "subtitleColor", "badgeColorMode",
+    "badgeTextColor", "badgeFollowTextColor",
+)
+
+
+def _generation_input(input: dict | None, ctx: Context) -> dict:
+    """任务显式参数 > 已保存的生成设置；不从存储继承目标范围或上传开关。"""
+    saved = _storage_value(ctx.mt.storage.get(key="ui-settings"))
+    merged = {k: saved[k] for k in GENERATION_SETTING_KEYS
+              if isinstance(saved, dict) and k in saved and saved[k] is not None}
+    merged.update(input or {})  # 保留显式的 False、空字符串和 None（重置默认值）。
+    if merged.get("serverId") in (None, ""):
+        active = _storage_value(ctx.mt.storage.get(key="active-server"))
+        if active not in (None, ""):
+            merged["serverId"] = active
+    return merged
+
+
 class EmbyDirect:
     """直连 Emby 取图片二进制。
 
@@ -420,13 +442,7 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @action("save-settings")
     def save_settings(self, input: dict, ctx: Context):
-        allowed = (
-            "sourceMode", "layout", "fontTitle", "fontSubtitle",
-            "badgeStyle", "badgeFont", "badgeSize", "posterCount",
-            "title", "subtitle", "titleSize", "subtitleSize", "titleColorMode", "titleColor",
-            "subtitleColorMode", "subtitleColor", "badgeColorMode",
-            "badgeTextColor", "badgeFollowTextColor",
-        )
+        allowed = GENERATION_SETTING_KEYS
         # 支持页面中多个区域分别保存：仅更新这次提交的字段，保留其他已保存项。
         saved = _storage_value(ctx.mt.storage.get(key="ui-settings")) or {}
         if not isinstance(saved, dict):
@@ -441,6 +457,7 @@ class Plugin(BasePlugin):
     # ------------------------------------------------------------------ #
     @action("generate-cover")
     def generate_cover(self, input: dict, ctx: Context):
+        input = _generation_input(input, ctx)
         _sid = input.get("serverId")
         server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
         target_id = str(input.get("targetId")) if input.get("targetId") not in (None, "") else None
@@ -712,7 +729,9 @@ class Plugin(BasePlugin):
         - 传入 libraryIds：只处理页面多选的媒体库（一个或多个）。
         - 不传 libraryIds：处理全部媒体库。
         遍历生成并上传，返回汇总；单个库失败不中断整体。
+        定时任务未填写的生成参数沿用工作台保存值。
         """
+        input = _generation_input(input, ctx)
         _sid = input.get("serverId")
         server_id = str(_sid) if _sid not in (None, "") else self._first_server_id(ctx)
         if not server_id:
